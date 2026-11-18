@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import StorageGuide from '@/components/storage-guide'
 import {
   ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Monitor, Moon, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
@@ -339,7 +338,6 @@ export default function BadgeGenerator() {
             )}
           </div>
         </div>
-        <StorageGuide />
       </div>
     </main>
   )
