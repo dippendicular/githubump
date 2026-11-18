@@ -1,9 +1,12 @@
+import type { BadgeDesign } from './badge-design'
+
 export type CountMode = 'unique' | 'total'
 
 export interface BadgeUrlOptions {
   mode?: CountMode
   ttl?: number
   preview?: boolean
+  design?: BadgeDesign
 }
 
 export function formatNumber(num: number): string {
@@ -34,6 +37,16 @@ export function generateBadgeUrl(
 
   if (options.preview) {
     params.set('preview', 'true')
+  }
+
+  const design = options.design
+  if (design) {
+    if (design.shape && design.shape !== 'auto') params.set('shape', design.shape)
+    if (design.font && design.font !== 'auto') params.set('font', design.font)
+    if (design.labelColor) params.set('labelColor', design.labelColor)
+    if (design.countColor) params.set('countColor', design.countColor)
+    if (design.labelPosition?.some(Boolean)) params.set('labelPosition', design.labelPosition.join(','))
+    if (design.countPosition?.some(Boolean)) params.set('countPosition', design.countPosition.join(','))
   }
 
   return `${baseUrl}/api/profile-views?${params.toString()}`

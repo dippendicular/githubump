@@ -138,10 +138,16 @@ Returns an SVG badge and increments the counter for the provided `username`. By 
 | `username` | string | `guest` | GitHub username or custom counter key |
 | `label` | string | `Profile views` | Text shown on the left side of the badge |
 | `color` | string | `0e75b6` | Hex color for the right side of the badge |
-| `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, `social`, `pill`, `outline`, `terminal`, `minimal`, `ticket`, `ledger`, or `orbit` |
+| `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, `social`, `pill`, `outline`, `terminal`, `minimal`, `ticket`, `ledger`, `orbit`, `arcade`, `blueprint`, `split`, `stamp`, `seal`, `stack`, `meter`, `ribbon`, `crest`, `marquee`, `glass`, `circuit`, `prism`, or `receipt` |
 | `mode` | string | `unique` | Counting mode: `unique` deduplicates repeat viewers during the TTL window, while `total` increments on every request |
 | `ttl` | number | `21600` | Unique-view deduplication window in seconds, clamped from `60` to `86400` |
-| `preview` | boolean | `false` | When `true`, returns a sample badge without reading or writing Redis |
+| `shape` | string | design default | `rectangle`, `rounded`, `square`, `circle`, `oval`, `pill`, `diamond`, `hexagon`, `octagon`, `shield`, or `ticket` |
+| `font` | string | design default | `sans`, `mono`, `serif`, `slab`, `condensed`, or `rounded` |
+| `labelColor`, `countColor` | hex color | design defaults | Background colors of the label and count regions |
+| `labelPosition`, `countPosition` | `x,y` | `0,0` | Signed offsets as percentages of the badge width and height, limited to −25 to 25 per axis |
+| `preview` | boolean | `false` | When `true`, returns a sample badge without reading or writing the counter database |
+
+In the editor, choose a design, set its font, shape, and two background colors, then use **Move label & count** to drag the text in the preview. You can also focus a handle and use the arrow keys. **Reset positions** returns the text to the design defaults. The generated Markdown, HTML, and URL include the appearance settings.
 
 Example:
 

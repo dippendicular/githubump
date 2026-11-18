@@ -1,25 +1,32 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Monitor, Moon, RotateCcw, Shuffle,
+  ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Monitor, Moon, Move, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
 } from 'lucide-react'
 import { formatNumber, generateBadgeUrl, generateMarkdownCode, type CountMode } from '@/lib/badge-utils'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
+import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
+import { badgeGeometry, FONTS, hasBadgeDesign, isNewDesign, renderBadgeDesign, SHAPES, type BadgeDesign, type Font, type Point, type Shape } from '@/lib/badge-design'
 import type { GitHubStats } from '@/lib/github-stats'
 
 const DEFAULTS = {
   username: 'dipcb05',
   label: 'Profile views',
-  color: '#0e75b6',
   style: 'flat' as BadgeStyle,
   mode: 'unique' as CountMode,
   ttl: '21600',
 }
 
 const STYLES = Object.keys(BADGE_STYLES) as BadgeStyle[]
+const ACCENT = '#0e75b6'
+const ZERO: Point = [0, 0]
+const svgSource = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`
+const THUMBNAILS = Object.fromEntries(STYLES.filter(isNewDesign).map((style) => [
+  style, svgSource(renderBadgeDesign('Views', '1.2K', ACCENT, style, {})),
+]))
 const THEMES = [
   { value: 'system', label: 'System', icon: Monitor },
   { value: 'light', label: 'Light', icon: Sun },
@@ -50,6 +57,8 @@ type Format = (typeof FORMATS)[number]['value']
 export default function BadgeGenerator() {
   const reduceMotion = useReducedMotion()
   const [settings, setSettings] = useState(DEFAULTS)
+  const [design, setDesign] = useState<BadgeDesign>({})
+  const [positioning, setPositioning] = useState(false)
   const [origin, setOrigin] = useState('')
   const [surface, setSurface] = useState<Theme>('system')
   const [theme, setTheme] = useState<Theme>('system')
@@ -60,18 +69,21 @@ export default function BadgeGenerator() {
   const [failedPreview, setFailedPreview] = useState('')
   const [profile, setProfile] = useState<{ username: string; stats: GitHubStats } | null>(null)
 
-  const { username, label, color, style, mode, ttl } = settings
+  const { username, label, style, mode, ttl } = settings
   const account = username.trim().toLowerCase() || 'guest'
   const validUsername = /^[a-z0-9-]{1,39}$/.test(account)
-  const validColor = /^#?(?:[\da-f]{3}|[\da-f]{6})$/i.test(color.trim())
-  const hex = validColor ? '#' + color.trim().replace(/^#/, '').toLowerCase() : DEFAULTS.color
-  const pickerColor = hex.length === 4 ? '#' + [...hex.slice(1)].map((digit) => digit.repeat(2)).join('') : hex
   const windowSeconds = ttl ? Math.min(86400, Math.max(60, Math.floor(Number(ttl)))) : Number(DEFAULTS.ttl)
-  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined }
+  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design }
+  const customPreview = positioning || isNewDesign(style) || hasBadgeDesign(design)
+  const geometry = badgeGeometry(style, design, ACCENT)
+  const previewLabel = label.trim().slice(0, 48) || DEFAULTS.label
+  const localPreview = customPreview ? svgSource(renderBadgeDesign(previewLabel, formatNumber(1234), ACCENT, style, design)) : undefined
+  const countPaint = design.countColor ?? geometry.recipe.count
+  const labelPaint = design.labelColor ?? geometry.recipe.label
 
-  const badgePath = generateBadgeUrl('', account, label, hex, style, options)
+  const badgePath = generateBadgeUrl('', account, label, ACCENT, style, options)
   const badgeUrl = origin ? origin + badgePath : ''
-  const previewUrl = generateBadgeUrl('', validUsername ? account : 'guest', label, hex, style, { preview: true })
+  const previewUrl = generateBadgeUrl('', validUsername ? account : 'guest', label, ACCENT, style, { preview: true, design })
   const stats = profile?.username === account ? profile.stats : null
   const outputs = {
     markdown: `![${account} profile views](${badgeUrl})`,
@@ -146,14 +158,22 @@ export default function BadgeGenerator() {
 
   function shuffleAppearance() {
     const styles = STYLES.filter((value) => value !== style)
-    const colors = COLORS.filter(([, value]) => value !== pickerColor)
+    const colors = COLORS.filter(([, value]) => value !== countPaint)
     const nextStyle = styles[Math.floor(Math.random() * styles.length)]
     const nextColor = colors[Math.floor(Math.random() * colors.length)][1]
-    setSettings((current) => ({ ...current, style: nextStyle, color: nextColor }))
+    setSettings((current) => ({ ...current, style: nextStyle }))
+    setDesign({ countColor: nextColor })
+    setCopyError(false)
+  }
+
+  function updateDesign<K extends keyof BadgeDesign>(key: K, value: BadgeDesign[K]) {
+    setDesign((current) => ({ ...current, [key]: value }))
     setCopyError(false)
   }
 
   function reset() {
+    setDesign({})
+    setPositioning(false)
     setSettings(DEFAULTS)
     setCopyError(false)
     setCopied('')
@@ -220,32 +240,50 @@ export default function BadgeGenerator() {
               </div>
 
               <fieldset className="field">
-                <legend>Badge color</legend>
-                <div className="color-field">
-                  <div className="color-swatches">
-                    {COLORS.map(([name, value]) => (
-                      <button key={value} type="button" className="color-swatch" style={{ background: value }} aria-label={name} title={name} aria-pressed={validColor && pickerColor === value} onClick={() => update('color', value)}>
-                        {validColor && pickerColor === value && <Check size={15} aria-hidden="true" />}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="custom-color">
-                    <input type="color" aria-label="Pick a custom color" value={pickerColor} onChange={(event) => update('color', event.target.value)} />
-                    <input className="hex-input" aria-label="Hex color" value={color} onChange={(event) => update('color', event.target.value)} maxLength={7} spellCheck={false} aria-invalid={!validColor} aria-describedby={!validColor ? 'color-error' : undefined} />
-                  </div>
-                </div>
-                {!validColor && <p id="color-error" className="field-error">Enter a 3- or 6-digit hex color. Using the default blue.</p>}
-              </fieldset>
-
-              <fieldset className="field">
                 <legend>Badge style</legend>
                 <div className="style-grid">
                   {STYLES.map((value) => (
                     <label key={value} className="style-option">
                       <input type="radio" name="badge-style" value={value} checked={style === value} onChange={() => update('style', value)} />
-                      <span className="style-sample" data-style={value} aria-hidden="true"><i /><i /></span>
+                      {THUMBNAILS[value] ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img className="style-thumbnail" src={THUMBNAILS[value]} alt="" />
+                      ) : <span className="style-sample" data-style={value} aria-hidden="true"><i /><i /></span>}
                       <span>{BADGE_STYLES[value]}</span>
                     </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="field badge-appearance">
+                <legend>Appearance</legend>
+                <div className="appearance-grid">
+                  <div className="appearance-choice">
+                    <label htmlFor="badge-font">Font</label>
+                    <select id="badge-font" value={design.font ?? 'auto'} onChange={(event) => updateDesign('font', event.target.value as Font)}>
+                      {Object.entries(FONTS).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+                    </select>
+                  </div>
+                  <div className="appearance-choice">
+                    <label htmlFor="badge-shape">Shape</label>
+                    <select id="badge-shape" value={design.shape ?? 'auto'} onChange={(event) => updateDesign('shape', event.target.value as Shape)}>
+                      {Object.entries(SHAPES).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+                    </select>
+                  </div>
+                  <div className="region-color">
+                    <label>Label color <input type="color" value={labelPaint} onChange={(event) => updateDesign('labelColor', event.target.value)} /></label>
+                    {design.labelColor && <button type="button" className="quiet-button" aria-label="Reset label color" onClick={() => updateDesign('labelColor', undefined)}>Auto</button>}
+                  </div>
+                  <div className="region-color">
+                    <label>Count color <input type="color" value={countPaint} onChange={(event) => updateDesign('countColor', event.target.value)} /></label>
+                    {design.countColor && <button type="button" className="quiet-button" aria-label="Reset count color" onClick={() => updateDesign('countColor', undefined)}>Auto</button>}
+                  </div>
+                </div>
+                <div className="color-swatches count-swatches" role="group" aria-label="Count color presets">
+                  {COLORS.map(([name, value]) => (
+                    <button key={value} type="button" className="color-swatch" style={{ background: value }} aria-label={name} title={name} aria-pressed={countPaint === value} onClick={() => updateDesign('countColor', value)}>
+                      {countPaint === value && <Check size={15} aria-hidden="true" />}
+                    </button>
                   ))}
                 </div>
               </fieldset>
@@ -286,9 +324,14 @@ export default function BadgeGenerator() {
               </div>
               <div className="preview-area">
                 <div className="preview-surface" data-surface={surface}>
-                  {failedPreview === previewUrl ? <button type="button" className="quiet-button retry-preview" onClick={() => setFailedPreview('')}>Retry preview</button> : (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={previewUrl} style={{ zoom: zoom / 100 }} alt={`${label.trim() || DEFAULTS.label} badge preview`} onError={() => setFailedPreview(previewUrl)} />
+                  {failedPreview === previewUrl && !localPreview ? <button type="button" className="quiet-button retry-preview" onClick={() => setFailedPreview('')}>Retry preview</button> : (
+                    <div className={customPreview ? "badge-preview-image is-custom" : "badge-preview-image"} style={customPreview ? { '--preview-width': `${geometry.width * zoom / 100}px` } as CSSProperties : undefined}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={localPreview ?? previewUrl} style={customPreview ? undefined : { zoom: zoom / 100 }} alt={`${previewLabel} badge preview`} onError={() => setFailedPreview(previewUrl)} />
+                      {positioning && <BadgePositionEditor label={geometry.label} count={geometry.count}
+                        offsets={{ labelPosition: design.labelPosition ?? ZERO, countPosition: design.countPosition ?? ZERO }}
+                        onMove={(key: PositionKey, value: Point) => updateDesign(key, value)} />}
+                    </div>
                   )}
                 </div>
                 <div className="preview-controls">
@@ -299,6 +342,14 @@ export default function BadgeGenerator() {
                   </label>
                   <a className="preview-open" href={previewUrl} target="_blank" rel="noreferrer">Open sample SVG <ArrowUpRight size={13} aria-hidden="true" /></a>
                 </div>
+                <div className="preview-position-actions">
+                  <button type="button" className="quiet-button" aria-pressed={positioning} onClick={() => setPositioning(!positioning)}><Move size={15} aria-hidden="true" /> {positioning ? 'Done moving' : 'Move label & count'}</button>
+                  {(design.labelPosition?.some(Boolean) || design.countPosition?.some(Boolean)) && <button type="button" className="quiet-button" onClick={() => {
+                    setDesign((current) => ({ ...current, labelPosition: undefined, countPosition: undefined }))
+                    setCopyError(false)
+                  }}>Reset positions</button>}
+                </div>
+                {positioning && <p className="preview-caption" id="position-help">Drag a handle or use the arrow keys. Hold Shift to move faster.</p>}
                 <p className="preview-caption">Preview uses a sample count.</p>
               </div>
             </motion.section>

@@ -1,3 +1,4 @@
+import { hasBadgeDesign, isNewDesign, NEW_DESIGNS, readBadgeDesign, renderBadgeDesign } from '@/lib/badge-design'
 import { getCounterStore } from '@/lib/counter-store'
 import { createHash } from 'crypto'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
@@ -15,7 +16,7 @@ type BadgeStyleConfig = {
   social?: boolean
 }
 
-const STYLES: Record<Exclude<BadgeStyle, 'ticket' | 'ledger' | 'orbit'>, BadgeStyleConfig> = {
+const STYLES: Record<Exclude<BadgeStyle, 'ticket' | 'ledger' | 'orbit' | keyof typeof NEW_DESIGNS>, BadgeStyleConfig> = {
   flat: { radius: 0, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
   'flat-square': { radius: 0, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
   plastic: { radius: 3, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
@@ -117,7 +118,7 @@ function renderIllustratedBadge(label: string, message: string, color: string, s
   </svg>`
 }
 
-function generateSVG(label: string, message: string, color: string, style: BadgeStyle = 'flat'): string {
+function generateSVG(label: string, message: string, color: string, style: Exclude<BadgeStyle, keyof typeof NEW_DESIGNS> = 'flat'): string {
   if (style === 'ticket' || style === 'ledger' || style === 'orbit') {
     return renderIllustratedBadge(label, message, color, style)
   }
@@ -176,7 +177,11 @@ export async function GET(request: NextRequest) {
     const isPreview = searchParams.get('preview') === 'true'
 
     const views = isPreview ? 1234 : await getViews(request, username, mode, ttlSeconds)
-    const svg = generateSVG(label, formatNumber(views), color, style)
+    const message = formatNumber(views)
+    const design = readBadgeDesign(searchParams)
+    const svg = isNewDesign(style) || hasBadgeDesign(design)
+      ? renderBadgeDesign(label, message, `#${color}`, style, design)
+      : generateSVG(label, message, color, style)
 
     return new NextResponse(svg, {
       headers: {
