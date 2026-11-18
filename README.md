@@ -1,20 +1,12 @@
 # githubump
 
-A self-hosted profile view counter for GitHub, GitLab, Forgejo, Gitea, and Codeberg and customizable README badge generator built with Next.js and TypeScript.
+<img width="1767" height="393" alt="githubump_logo_light" src="https://github.com/user-attachments/assets/b5c33b85-d75a-4989-b920-09c8768dec04" />
 
-githubump lets you run your own profile view badge service instead of depending on a third-party counter. It exposes a lightweight SVG badge endpoint, stores counts in your chosen database, and includes a polished web UI for generating badge URLs and copy-ready HTML.
 
-## Features
 
-- Generate GitHub-compatible SVG profile view badges
-- Store profile views in Upstash Redis, your own Redis server, or SQLite
-- Count unique views with TTL-based deduplication to avoid refresh spam
-- Customize badge label, color, username, style, count mode, and unique-view TTL
-- Preview badges in the browser before copying them
-- Copy ready-to-use HTML for a GitHub profile README
-- Optional GitHub profile stats for followers, following, public repos, and total stars
-- Lightweight API endpoint designed for README image embeds
-- Works with any deployment platform that supports Next.js and environment variables
+A profile view counter for GitHub, provide a badge. 
+
+githubump lets you run your own profile view badge service instead of depending on a third-party counter. It exposes a lightweight SVG badge endpoint, stores counts in your chosen database.
 
 ## How It Works
 
