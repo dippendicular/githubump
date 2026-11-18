@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Monitor, Moon, Move, RotateCcw, Shuffle,
+  ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Moon, Move, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
 } from 'lucide-react'
 import { formatNumber, generateBadgeUrl, generateMarkdownCode, type CountMode } from '@/lib/badge-utils'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
+import ThemedSelect from '@/components/themed-select'
 import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
-import { badgeGeometry, FONTS, hasBadgeDesign, isNewDesign, renderBadgeDesign, SHAPES, type BadgeDesign, type Font, type Point, type Shape } from '@/lib/badge-design'
+import { badgeGeometry, FONTS, hasBadgeDesign, isNewDesign, renderBadgeDesign, SHAPES, type BadgeDesign, type Point } from '@/lib/badge-design'
 import { PLATFORMS, PLATFORM_IDS, platformUsername, type Platform } from '@/lib/platforms'
 import { withRepositoryBadge, type RepositoryOrder } from '@/lib/repository-badge'
 import type { GitHubStats } from '@/lib/github-stats'
@@ -29,12 +30,16 @@ const THUMBNAILS = Object.fromEntries(STYLES.filter(isNewDesign).map((style) => 
   style, svgSource(renderBadgeDesign('Views', '1.2K', ACCENT, style, {})),
 ]))
 const THEMES = [
-  { value: 'system', label: 'System', icon: Monitor },
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
 ] as const
 
-type Theme = (typeof THEMES)[number]['value']
+type VisibleTheme = (typeof THEMES)[number]['value']
+type Theme = VisibleTheme | 'system'
+const REPOSITORY_ORDERS: Record<RepositoryOrder, string> = {
+  'views-first': 'Views first',
+  'repos-first': 'Repositories first',
+}
 const THEME_KEY = 'github-counter-theme'
 
 const COLORS = [
@@ -57,6 +62,8 @@ type Format = (typeof FORMATS)[number]['value']
 
 export default function BadgeGenerator() {
   const reduceMotion = useReducedMotion()
+  const workspace = useRef<HTMLElement>(null)
+  const [systemTheme, setSystemTheme] = useState<VisibleTheme>('light')
   const [settings, setSettings] = useState(DEFAULTS)
   const [platform, setPlatform] = useState<Platform>('github')
   const [handles, setHandles] = useState<Partial<Record<Platform, string>>>({})
@@ -68,6 +75,8 @@ export default function BadgeGenerator() {
   const [origin, setOrigin] = useState('')
   const [surface, setSurface] = useState<Theme>('system')
   const [theme, setTheme] = useState<Theme>('system')
+  const visibleTheme = theme === 'system' ? systemTheme : theme
+  const visibleSurface = surface === 'system' ? visibleTheme : surface
   const [zoom, setZoom] = useState(140)
   const [format, setFormat] = useState<Format>('markdown')
   const [copied, setCopied] = useState('')
@@ -115,12 +124,17 @@ export default function BadgeGenerator() {
 
   useEffect(() => {
     setOrigin(window.location.origin)
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    const syncScheme = () => setSystemTheme(scheme.matches ? 'dark' : 'light')
+    syncScheme()
+    scheme.addEventListener('change', syncScheme)
     try {
       const saved = window.localStorage.getItem(THEME_KEY)
       if (saved === 'light' || saved === 'dark') setTheme(saved)
     } catch {
       // Theme controls remain available when storage is restricted.
     }
+    return () => scheme.removeEventListener('change', syncScheme)
   }, [])
 
   useEffect(() => {
@@ -233,7 +247,7 @@ export default function BadgeGenerator() {
   })
 
   return (
-    <main className="badge-workspace" data-theme={theme}>
+    <main ref={workspace} className="badge-workspace" data-theme={theme}>
       <header className="workspace-bar">
         <div className="workspace-width bar-content">
           <div className="workspace-brand">
@@ -244,8 +258,8 @@ export default function BadgeGenerator() {
           <div className="bar-actions">
             <div className="surface-toggle site-theme" role="group" aria-label="Site theme">
               {THEMES.map(({ value, label, icon: Icon }) => (
-                <button key={value} type="button" aria-label={`${label} site theme`} title={`${label} site theme`} aria-pressed={theme === value} onClick={() => changeTheme(value)}>
-                  <Icon size={16} aria-hidden="true" />
+                <button key={value} type="button" aria-label={`${label} site theme`} title={`${label} site theme`} aria-pressed={visibleTheme === value} onClick={() => changeTheme(value)}>
+                  <Icon size={15} aria-hidden="true" /><span>{label}</span>
                 </button>
               ))}
             </div>
@@ -272,13 +286,11 @@ export default function BadgeGenerator() {
             <div className="editor-fields">
               <div className="platform-fields">
                 <div className="field appearance-choice">
-                  <label htmlFor="badge-platform">Platform</label>
-                  <select id="badge-platform" value={platform} onChange={(event) => {
-                    setPlatform(event.target.value as Platform)
+                  <label id="badge-platform-label" htmlFor="badge-platform">Platform</label>
+                  <ThemedSelect id="badge-platform" container={workspace} items={PLATFORMS} value={platform} onChange={(value) => {
+                    setPlatform(value)
                     setCopyError(false)
-                  }}>
-                    {PLATFORM_IDS.map((id) => <option key={id} value={id}>{PLATFORMS[id]}</option>)}
-                  </select>
+                  }} />
                 </div>
                 <div className="field">
                   <label htmlFor="badge-username">Username</label>
@@ -302,11 +314,11 @@ export default function BadgeGenerator() {
                 </div>
                 <label className="repository-check"><input type="checkbox" checked={showRepos} onChange={(event) => { setShowRepos(event.target.checked); setCopyError(false) }} /> Show public repositories on badge</label>
                 {showRepos && <div className="appearance-choice repository-order">
-                  <label htmlFor="repo-order">Badge order</label>
-                  <select id="repo-order" value={repoOrder} onChange={(event) => { setRepoOrder(event.target.value as RepositoryOrder); setCopyError(false) }}>
-                    <option value="views-first">Views first</option>
-                    <option value="repos-first">Repositories first</option>
-                  </select>
+                  <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
+                  <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
+                    setRepoOrder(value)
+                    setCopyError(false)
+                  }} />
                 </div>}
               </fieldset>
 
@@ -335,16 +347,12 @@ export default function BadgeGenerator() {
                 <legend>Appearance</legend>
                 <div className="appearance-grid">
                   <div className="appearance-choice">
-                    <label htmlFor="badge-font">Font</label>
-                    <select id="badge-font" value={design.font ?? 'auto'} onChange={(event) => updateDesign('font', event.target.value as Font)}>
-                      {Object.entries(FONTS).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
-                    </select>
+                    <label id="badge-font-label" htmlFor="badge-font">Font</label>
+                    <ThemedSelect id="badge-font" container={workspace} items={FONTS} value={design.font ?? 'auto'} onChange={(value) => updateDesign('font', value)} />
                   </div>
                   <div className="appearance-choice">
-                    <label htmlFor="badge-shape">Shape</label>
-                    <select id="badge-shape" value={design.shape ?? 'auto'} onChange={(event) => updateDesign('shape', event.target.value as Shape)}>
-                      {Object.entries(SHAPES).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
-                    </select>
+                    <label id="badge-shape-label" htmlFor="badge-shape">Shape</label>
+                    <ThemedSelect id="badge-shape" container={workspace} items={SHAPES} value={design.shape ?? 'auto'} onChange={(value) => updateDesign('shape', value)} />
                   </div>
                   <div className="region-color">
                     <label>Label color <input type="color" value={labelPaint} onChange={(event) => updateDesign('labelColor', event.target.value)} /></label>
@@ -393,9 +401,8 @@ export default function BadgeGenerator() {
               <div className="card-heading">
                 <h2><Eye size={18} aria-hidden="true" /> Live preview</h2>
                 <div className="surface-toggle" role="group" aria-label="Preview background">
-                  <button type="button" aria-label="Match site background" title="Match site background" aria-pressed={surface === 'system'} onClick={() => setSurface('system')}><Monitor size={15} aria-hidden="true" /></button>
-                  <button type="button" aria-label="Light background" title="Light background" aria-pressed={surface === 'light'} onClick={() => setSurface('light')}><Sun size={16} aria-hidden="true" /></button>
-                  <button type="button" aria-label="Dark background" title="Dark background" aria-pressed={surface === 'dark'} onClick={() => setSurface('dark')}><Moon size={15} aria-hidden="true" /></button>
+                  <button type="button" aria-label="Light background" title="Light background" aria-pressed={visibleSurface === 'light'} onClick={() => setSurface('light')}><Sun size={16} aria-hidden="true" /></button>
+                  <button type="button" aria-label="Dark background" title="Dark background" aria-pressed={visibleSurface === 'dark'} onClick={() => setSurface('dark')}><Moon size={15} aria-hidden="true" /></button>
                 </div>
               </div>
               <div className="preview-area">
