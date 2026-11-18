@@ -1,59 +1,62 @@
-# githubump
+<img width="560" alt="githubump" src="https://github.com/user-attachments/assets/b5c33b85-d75a-4989-b920-09c8768dec04" />
 
-<img width="1767" height="393" alt="githubump_logo_light" src="https://github.com/user-attachments/assets/b5c33b85-d75a-4989-b920-09c8768dec04" />
+A little badge for your README, with a counter you run yourself
 
+githubump makes SVG view badges for GitHub, GitLab, Forgejo, Gitea, and Codeberg. 
 
+Pick a style, change the colors, drag the numbers into place, and copy the Markdown. You can put the public repo count beside the view count, too. A tiny badge can have a little personality.
 
-A profile view counter for GitHub, provide a badge. 
+<img width="588" height="590" alt="image" src="https://github.com/user-attachments/assets/f49de37e-45ea-439f-8061-7b3170a626d6" />
 
-githubump lets you run your own profile view badge service instead of depending on a third-party counter. It exposes a lightweight SVG badge endpoint, stores counts in your chosen database.
+## How the counter works
 
-## How It Works
+- **Unique views** is the default. githubump hashes the username, IP address, and user agent it sees on the request. If that fingerprint comes back for the same counter within six hours, the badge shows the current number without adding another view. Set `ttl` to change the window.
+- **Every request** (`mode=total`) adds one each time the badge endpoint receives a request. That includes direct opens, reloads that reach the server, and requests from bots.
 
-The app has two main parts:
+The number reflects the requests that reach your server. An image proxy can serve a cached badge without making a fresh request, and multiple visitors behind a proxy can look alike in unique mode. Think of it as a badge counter for your README.
 
-1. A web interface where you enter a GitHub username and customize the badge.
-2. An API route at `/api/profile-views` that increments the stored counter and returns an SVG badge.
+## Run it locally
 
-When a badge is loaded in a README, GitHub requests the SVG image URL. That request hits the API, increments the stored count for the selected username, and returns the latest count as a badge image.
-
-## Tech Stack
-
-- Next.js
-- Upstash Redis, standalone Redis, or SQLite
-- GitHub REST API
-
-## Requirements
-
-- Node.js compatible with Next.js 16
-- pnpm
-- One counter backend: Upstash Redis, standalone Redis, or SQLite
-- Optional GitHub personal access token for GitHub stats
-- Optional admin token for resetting or setting counters
-
-## Getting Started
-
-Install dependencies:
+Use Node.js 22.13 or newer and pnpm. SQLite is the quickest way to try it. Install the dependencies and copy the sample environment file.
 
 ```bash
 pnpm install
-```
-
-Create a local environment file:
-
-```bash
 cp .env.example .env.local
 ```
 
-Choose one [counter storage](#counter-storage) option below and set its variables in `.env.local`. Then run `pnpm dev` and open `http://localhost:3000`.
+Set these values in `.env.local`.
 
-## Counter storage
+```dotenv
+COUNTER_STORAGE=sqlite
+COUNTER_SQLITE_PATH=./data/counters.sqlite
+```
 
-Set these variables on the server. On Vercel, use **Project → Settings → Environment Variables** and redeploy. For local development, edit `.env.local`. On a self-hosted production server, configure them in the service that starts `pnpm start`. Store credentials privately.
+Run `pnpm dev` and open `http://localhost:3000`. The app creates the database on first use.
+
+To check that storage works, open `/api/profile-views?username=storage-test&mode=total` twice. Then open `/api/profile-views/stats?username=storage-test`. The stored count should have gone up by two.
+
+## Choose your storage
+
+Use `.env.local` for local development and set the same variables in your runtime environment when deploying. Keep credentials on the server.
+
+### SQLite
+
+Use SQLite for a single app instance with a writable, persistent disk. Set `COUNTER_STORAGE=sqlite` and point `COUNTER_SQLITE_PATH` at the database file. In production, use an absolute path on the persistent volume and back up that file with SQLite's backup tools.
+
+### Standalone Redis
+
+Use a Redis instance reachable from the app. Enable persistence if you want counts to survive Redis restarts.
+
+```dotenv
+COUNTER_STORAGE=redis
+REDIS_URL=redis://127.0.0.1:6379
+```
+
+Use a `rediss://` URL for a server that requires TLS. The Redis account needs permission to run `EVAL`, `GET`, `SET`, `EXISTS`, `INCR`, and `EXPIRE`.
 
 ### Upstash Redis
 
-Use this option on Vercel or when you want a managed database. In Upstash, open your database’s **REST API** section and copy the URL and **read/write** token. Existing deployments using these variables can leave `COUNTER_STORAGE` unset. Upstash remains the default, and the existing `views:<username>` keys still work.
+Use the REST API URL and read/write token from your Upstash database.
 
 ```dotenv
 COUNTER_STORAGE=upstash
@@ -61,255 +64,73 @@ KV_REST_API_URL=https://your-database.upstash.io
 KV_REST_API_TOKEN=your-read-write-token
 ```
 
-### SQLite
+Existing Upstash deployments can leave `COUNTER_STORAGE` unset. The app still reads the existing GitHub counter keys.
 
-Use this option on one self-hosted machine with Node.js 22.13 or newer. Pick a writable path on a persistent volume. The app creates the file and tables on first use. For local development, `./data/counters.sqlite` works. For production, mount a writable volume and use its absolute path. Keep one deployment using the file and back it up with SQLite’s backup facilities. Vercel Functions have ephemeral local storage, so use Upstash or external Redis there.
+Each backend has its own data. If you move an existing badge to a new backend, read its exact count through the stats endpoint first, then seed that value through the admin endpoint. The new backend starts with a fresh deduplication history.
 
-```dotenv
-COUNTER_STORAGE=sqlite
-COUNTER_SQLITE_PATH=./data/counters.sqlite
-```
+## Deploy it
 
-### Your own Redis
-
-Run a standalone Redis instance on a private network reachable from the app. Enable persistence and use authentication. For local development with Docker, start a Redis container bound to loopback with a named data volume:
-
-```bash
-docker run -d --name github-counter-redis -p 127.0.0.1:6379:6379 \
-  -v github-counter-redis:/data redis:8-alpine redis-server --appendonly yes
-```
-
-Then point the app to that local instance:
-
-```dotenv
-COUNTER_STORAGE=redis
-REDIS_URL=redis://127.0.0.1:6379
-```
-
-For an authenticated remote instance that requires TLS, use its `rediss://username:password@host:port` connection URL. Percent-encode special characters in credentials. The app needs permission to run `EVAL`, `GET`, `SET`, `EXISTS`, `INCR`, and `EXPIRE`.
-
-### Verify the connection
-
-1. Restart or redeploy the app after saving your settings.
-2. Open `/api/profile-views?username=storage-test&mode=total` twice. The second request should add one view.
-3. Open `/api/profile-views/stats?username=storage-test` to read the exact count without incrementing it.
-4. Set `ADMIN_API_TOKEN` to a random secret if you want to seed or reset counts through the [admin endpoint](#additional-api-endpoints). Set `GITHUB_API_TOKEN` only if you want GitHub stats.
-
-Each backend has its own data. Before switching an existing badge to a different database, read its old count using the stats endpoint and seed the new database with the admin endpoint. Unique-visitor history starts fresh when the database changes.
-
-## Badge Usage
-
-Use the app UI to generate a badge, or build the URL manually:
-
-```text
-https://yourdomain.com/api/profile-views?username=yourname&label=Profile%20views&color=0e75b6&style=flat&mode=unique&ttl=21600
-```
-
-Add it to a GitHub README:
-
-```html
-<img src="https://yourdomain.com/api/profile-views?username=yourname&label=Profile%20views&color=0e75b6&style=flat&mode=unique&ttl=21600" alt="profile views" />
-```
-
-Markdown also works:
-
-```md
-![Profile views](https://yourdomain.com/api/profile-views?username=yourname&label=Profile%20views&color=0e75b6&style=flat&mode=unique&ttl=21600)
-```
-
-Replace `yourdomain.com` with the domain where you deploy the app, and replace `yourname` with the GitHub username or counter key you want to track.
-
-## API Reference
-
-### `GET /api/profile-views`
-
-Returns an SVG badge and increments the counter for the provided `username`. By default, it counts a viewer once per TTL window instead of counting every refresh.
-
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `username` | string | `guest` | Username on the selected platform |
-| `platform` | string | `github` | `github`, `gitlab`, `forgejo`, `gitea`, or `codeberg` |
-| `showRepos` | boolean | `false` | Add the platform’s public repository count |
-| `repoOrder` | string | `views-first` | Use `repos-first` to show repositories before views |
-| `repoLabel`, `repoStyle` | string | design defaults | Customize the repository badge independently. The editor lists compatible styles. |
-| `repoShape`, `repoFont`, `repoLabelColor`, `repoCountColor` | string | design defaults | Repository-only appearance overrides |
-| `repoLabelPosition`, `repoCountPosition` | `x,y` | `0,0` | Repository-only label and count offsets |
-| `label` | string | `Profile views` | Text shown on the left side of the badge |
-| `color` | string | `0e75b6` | Hex color for the right side of the badge |
-| `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, `social`, `pill`, `outline`, `terminal`, `minimal`, `ticket`, `ledger`, `orbit`, `arcade`, `blueprint`, `split`, `stamp`, `seal`, `stack`, `meter`, `ribbon`, `crest`, `marquee`, `glass`, `circuit`, `prism`, or `receipt` |
-| `mode` | string | `unique` | Counting mode: `unique` deduplicates repeat viewers during the TTL window, while `total` increments on every request |
-| `ttl` | number | `21600` | Unique-view deduplication window in seconds, clamped from `60` to `86400` |
-| `shape` | string | design default | `rectangle`, `rounded`, `square`, `circle`, `oval`, `pill`, `diamond`, `hexagon`, `octagon`, `shield`, or `ticket` |
-| `font` | string | design default | `sans`, `mono`, `serif`, `slab`, `condensed`, or `rounded` |
-| `labelColor`, `countColor` | hex color | design defaults | Background colors of the label and count regions |
-| `labelPosition`, `countPosition` | `x,y` | `0,0` | Signed offsets as percentages of the badge width and height, limited to −25 to 25 per axis |
-| `preview` | string | omitted | `stored` shows the stored count without incrementing it, using full numbers by default. `true` shows a sample count. |
-| `countFormat` | string | compact | Use `exact` for full numbers (17,654) or `compact` for abbreviated numbers (17.7K). The editor’s **Show full view count** checkbox sets this option for previews and embeds. |
-
-In the editor, choose a design, set its font, shape, and two background colors, then use **Move label & count** to drag the text in the preview. You can also focus a handle and use the arrow keys. **Reset positions** returns the text to the design defaults. The generated Markdown, HTML, and URL include the appearance settings.
-
-Example:
-
-```text
-/api/profile-views?username=dippendicular&label=Profile%20views&color=0e75b6&style=flat&mode=unique&ttl=21600
-```
-
-The API response uses:
-
-- `Content-Type: image/svg+xml`
-- `Cache-Control: no-cache, no-store, must-revalidate`
-
-The no-cache headers help keep the displayed counter fresh when the badge is requested. Use `mode=total` only when you intentionally want every request, refresh, and image reload to increment the badge.
-
-
-## Platforms and repository counts
-
-Choose a platform and enter its username. The editor shows the platform’s public repository count. Enable **Show public repositories on badge** to include it, and choose **Views first** or **Repositories first**. If the provider is unavailable, the badge displays a dash for repositories and still shows views.
-
-GitHub and GitLab lookups use their public APIs. Codeberg uses `https://codeberg.org`. Forgejo and Gitea use `https://code.forgejo.org` and `https://gitea.com` by default. To look up repositories on a different instance, set `FORGEJO_URL` or `GITEA_URL` to that instance’s base URL on the server. Each deployment tracks one instance per platform. `GITHUB_API_TOKEN` is optional for public repository counts and increases the available GitHub API quota.
-
-Views are recorded separately by platform. Existing badges without a platform parameter keep using their original GitHub counters. A badge counts requests to its URL, including when embedded in a README. The read-only endpoints below leave counts alone.
-
-| Route | Result |
-| --- | --- |
-| `GET /api/views/gitlab/alice` | JSON with the platform, username, and stored view count |
-| `GET /api/public-repositories/codeberg/alice` | JSON with the platform, username, and current public repository count |
-| `GET /views/all/alice` | A page with views for `alice` on all five platforms and the total |
-
-For different usernames, add platform-specific aliases, for example `/views/all/alice?gitlab=alice-dev&codeberg=alice_code`. The editor builds this link using the usernames entered under each platform. The link groups the handles you supply. It does not verify that they belong to the same person.
-
-### Badge fonts and icons
-
-Expand **Appearance** to customize the views badge and, when enabled, the repository badge. Badge styles are in horizontal carousels. Both badges support system font families and 12 bundled Google Fonts, including Inter, Space Grotesk, Playfair Display, and IBM Plex Mono. The Google Fonts are embedded in exported SVGs with a fallback for characters outside their Latin subset.
-
-Search the **Views icon** or **Repository icon** picker for icons across [Font Awesome Free](https://fontawesome.com/license/free) Solid, Regular, and Brands. The full free catalog is searchable. A selected icon is drawn directly in the SVG. The generated links use `font` or `repoFont` for fonts and `icon` or `repoIcon` for icons (for example, `brands:github`).
-
-## Additional API Endpoints
-
-### `GET /api/profile-views/stats`
-
-Returns the stored counter value as JSON without incrementing it.
-
-```text
-/api/profile-views/stats?username=dippendicular
-```
-
-Example response:
-
-```json
-{ "username": "dippendicular", "views": 1234 }
-```
-
-### `POST /api/profile-views/admin`
-
-Resets or sets a counter. Pass the optional `platform` field for a platform other than GitHub. This endpoint requires `ADMIN_API_TOKEN` and an `Authorization` header.
-
-Reset a counter:
-
-```bash
-curl -X POST https://yourdomain.com/api/profile-views/admin \
-  -H "Authorization: Bearer $ADMIN_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"dippendicular","action":"reset"}'
-```
-
-Set a counter:
-
-```bash
-curl -X POST https://yourdomain.com/api/profile-views/admin \
-  -H "Authorization: Bearer $ADMIN_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"dippendicular","action":"set","count":1000}'
-```
-
-### `GET /api/github-stats`
-
-Returns optional GitHub profile stats as JSON for the badge generator UI. It uses `GITHUB_API_TOKEN` on the server so the token is not exposed to browser code.
-
-```text
-/api/github-stats?username=dippendicular
-```
-
-## GitHub Stats
-
-The badge counter works with any configured storage backend. GitHub stats are optional and are used by the web UI to show extra profile information.
-
-With `GITHUB_API_TOKEN` configured, the app can fetch:
-
-- Followers
-- Following
-- Public repositories
-- Total stars across public repositories
-
-If the token is missing or the GitHub API request fails, the badge generator still works.
-
-## Scripts
-
-```bash
-pnpm dev
-```
-
-Start the local development server.
+Run the app on a host that supports Next.js and give it a public HTTPS URL so README image fetches can reach it. For a Node.js server, build and start it with these commands.
 
 ```bash
 pnpm build
-```
-
-Create a production build.
-
-```bash
 pnpm start
 ```
 
-Run the production build.
+Use SQLite when the app runs as a single instance with persistent storage. Use an external Redis backend when the app runs on multiple instances or the local filesystem is ephemeral.
+
+`GITHUB_API_TOKEN` is optional. It enables the extra GitHub profile stats in the editor and raises the rate limit for GitHub repo lookups. Set `ADMIN_API_TOKEN` if you want to seed or reset counters through the admin API.
+
+## Put a badge in your README
+
+Open the editor, pick a platform, and enter your handle. Choose a style, then use **Appearance** to tweak the font, shape, colors, and icon. **Move label & count** lets you drag the text or nudge it with the arrow keys. When it looks right, copy the Markdown, HTML, or URL.
+
+The editor reads the stored number without adding a view, so you can fiddle with the colors all afternoon.
+
+Here's a GitLab badge with public repositories enabled. Replace `badges.example.com` with your deployment's hostname and `alice` with your handle.
+
+```md
+![GitLab profile views](https://badges.example.com/api/profile-views?platform=gitlab&username=alice&style=flat&showRepos=true)
+```
+
+## API
+
+### `GET /api/profile-views`
+
+Returns an SVG badge. These are the parameters you'll use most often.
+
+| Parameter | What it does |
+| --- | --- |
+| `platform` | `github`, `gitlab`, `forgejo`, `gitea`, or `codeberg`. Defaults to `github`. |
+| `username` | Profile handle. Defaults to `guest` when omitted. |
+| `mode` | `unique` for deduplicated views, or `total` for every request. Defaults to `unique`. |
+| `ttl` | Deduplication window in seconds. Defaults to `21600` and is clamped to `60`–`86400`. |
+| `preview` | Use `stored` for the current count or `true` for a sample count. Both leave the counter alone. |
+| `showRepos` | Set to `true` to include the public repository count. |
+| `repoOrder` | `views-first` or `repos-first`. |
+| `countFormat` | `exact` for a number like `17,654` or `compact` for `17.7K`. |
+| `label`, `style`, `color` | Set the badge text, style, and count background color. |
+| `shape`, `font`, `icon`, `labelColor`, `countColor` | Customize the badge. The repository badge has its own controls in the editor. |
+| `labelPosition`, `countPosition` | Text offsets as `x,y` percentages, from −25 to 25 per axis. |
+
+For appearance options, the easiest reference is the URL the editor generates. Bundled fonts are embedded in the SVG, and you can search Font Awesome Free icons from the picker.
+
+### Read counts and profile data
+
+| Route | Returns |
+| --- | --- |
+| `GET /api/profile-views/stats?username=alice&platform=gitlab` | Exact stored view count |
+| `GET /api/views/gitlab/alice` | Stored view count for a platform and handle |
+| `GET /api/public-repositories/codeberg/alice` | Public repository count from the provider |
+| `GET /api/github-stats?username=alice` | Optional GitHub profile stats such as followers and public repo stars |
+
+### Set or reset a count
+
+`POST /api/profile-views/admin` requires `Authorization: Bearer <ADMIN_API_TOKEN>`. Pass `username`, an `action` of `set` or `reset`, and a `count` for `set`. Include `platform` for a counter outside GitHub.
 
 ```bash
-pnpm lint
+curl -X POST https://badges.example.com/api/profile-views/admin \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"platform":"gitlab","username":"alice","action":"set","count":1000}'
 ```
-
-Run linting.
-
-## Deployment
-
-Deploy on a Node.js host and configure one [counter storage](#counter-storage) backend. Your badge endpoint needs a public HTTPS URL so GitHub can load the image.
-
-After deployment, use your production domain in the badge URL:
-
-```text
-https://yourdomain.com/api/profile-views?username=yourname
-```
-
-## Project Structure
-
-```text
-app/
-  api/profile-views/route.ts        SVG badge API route
-  api/profile-views/stats/route.ts  JSON count endpoint
-  api/profile-views/admin/route.ts  authenticated counter admin endpoint
-  api/github-stats/route.ts         server-side GitHub stats endpoint
-  layout.tsx                  Root metadata and layout
-  page.tsx                    Home page
-components/
-  badge-generator.tsx         Main badge generator UI
-components/ui/
-  button.tsx                  Shared button component
-lib/
-  badge-utils.ts              Badge URL, number formatting, and embed helpers
-  github-stats.ts             Optional GitHub API helpers
-public/
-  icons and public assets
-```
-
-## Troubleshooting
-
-If the badge returns an error, check that the selected backend’s variables and connection are correct. The editor preview reads the current count without adding a view. Use `preview=true` for a sample independent of storage.
-
-If the badge works locally but not in a GitHub README, make sure the deployed URL is public and returns an SVG when opened directly in the browser.
-
-If GitHub stats do not show in the UI, confirm that `GITHUB_API_TOKEN` is configured and has access to public user and repository data.
-
-If the counter appears stale on GitHub, wait a few minutes. GitHub may cache external images even when the API response asks clients not to cache them.
-
-## License
-
-MIT. See [LICENSE](./LICENSE).
