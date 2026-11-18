@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis'
 import { createHash } from 'crypto'
+import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
 import { NextRequest, NextResponse } from 'next/server'
 
 const redis = new Redis({
@@ -7,16 +8,28 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN,
 })
 
-const STYLES = {
+type BadgeStyleConfig = {
+  radius: number
+  height: number
+  fontSize: number
+  yShadow: number
+  yText: number
+  fontFamily: string
+  social?: boolean
+}
+
+const STYLES: Record<BadgeStyle, BadgeStyleConfig> = {
   flat: { radius: 0, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
   'flat-square': { radius: 0, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
   plastic: { radius: 3, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
   rounded: { radius: 10, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif' },
   'for-the-badge': { radius: 4, height: 28, fontSize: 120, yShadow: 190, yText: 180, fontFamily: 'Arial,Helvetica,sans-serif' },
   social: { radius: 3, height: 20, fontSize: 110, yShadow: 150, yText: 140, fontFamily: 'Verdana,Geneva,DejaVu Sans,sans-serif', social: true },
+  pill: { radius: 12, height: 24, fontSize: 115, yShadow: 168, yText: 158, fontFamily: 'Verdana,Geneva,sans-serif' },
+  outline: { radius: 5, height: 24, fontSize: 115, yShadow: 168, yText: 158, fontFamily: 'Verdana,Geneva,sans-serif' },
+  terminal: { radius: 4, height: 24, fontSize: 115, yShadow: 168, yText: 158, fontFamily: 'Consolas,DejaVu Sans Mono,monospace' },
+  minimal: { radius: 4, height: 24, fontSize: 115, yShadow: 168, yText: 158, fontFamily: 'Verdana,Geneva,sans-serif' },
 }
-
-type BadgeStyle = keyof typeof STYLES
 type CountMode = 'unique' | 'total'
 
 const DEFAULT_COLOR = '0e75b6'
@@ -107,10 +120,14 @@ function generateSVG(label: string, message: string, color: string, style: Badge
   const messageWidth = Math.max(message.length * (style === 'for-the-badge' ? 8 : 7) + 14, 50)
   const totalWidth = labelWidth + messageWidth
   const leftX = labelWidth
-  const rightFill = styleConfig.social ? '#fafafa' : `#${color}`
-  const rightTextFill = styleConfig.social ? '#333' : '#fff'
-  const leftFill = styleConfig.social ? '#f5f5f5' : '#555'
-  const leftTextFill = styleConfig.social ? '#333' : '#fff'
+  const plain = style === 'outline' || style === 'minimal' || style === 'terminal'
+  const neutral = style === 'terminal' ? '#111827' : '#f8fafc'
+  const accent = `#${color}`
+  const outline = style === 'outline' ? `<rect x=".5" y=".5" width="${totalWidth - 1}" height="${height - 1}" rx="${styleConfig.radius}" fill="none" stroke="${accent}"/>` : ''
+  const rightFill = plain ? neutral : styleConfig.social ? '#fafafa' : accent
+  const rightTextFill = style === 'terminal' ? '#dcfce7' : plain ? '#0f172a' : styleConfig.social ? '#333' : '#fff'
+  const leftFill = plain ? neutral : style === 'pill' ? '#27243c' : styleConfig.social ? '#f5f5f5' : '#555'
+  const leftTextFill = style === 'terminal' ? '#d1d5db' : plain ? '#334155' : styleConfig.social ? '#333' : '#fff'
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${height}" role="img" aria-label="${safeLabel}: ${safeMessage}">
     <title>${safeLabel}: ${safeMessage}</title>
@@ -124,12 +141,15 @@ function generateSVG(label: string, message: string, color: string, style: Badge
     <g clip-path="url(#r)">
       <rect width="${labelWidth}" height="${height}" fill="${leftFill}"/>
       <rect x="${leftX}" width="${messageWidth}" height="${height}" fill="${rightFill}"/>
-      <rect width="${totalWidth}" height="${height}" fill="url(#s)" opacity="${styleConfig.social ? '0.05' : '0.1'}"/>
+      <rect width="${totalWidth}" height="${height}" fill="url(#s)" opacity="${plain ? '0' : styleConfig.social ? '0.05' : '0.1'}"/>
+      ${style === 'minimal' ? `<rect y="${height - 2}" width="${totalWidth}" height="2" fill="${accent}"/>` : ''}
+      ${style === 'terminal' ? `<circle cx="${leftX + 5}" cy="${height / 2}" r="2.5" fill="${accent}"/>` : ''}
     </g>
+    ${outline}
     <g text-anchor="middle" font-family="${styleConfig.fontFamily}" text-rendering="geometricPrecision" font-size="${styleConfig.fontSize}" letter-spacing="-0.05em">
-      <text aria-hidden="true" x="${(labelWidth / 2) * 10}" y="${styleConfig.yShadow}" fill="#010101" fill-opacity="0.3" transform="scale(.1)">${safeLabel}</text>
+      <text aria-hidden="true" x="${(labelWidth / 2) * 10}" y="${styleConfig.yShadow}" fill="#010101" fill-opacity="${plain ? 0 : 0.3}" transform="scale(.1)">${safeLabel}</text>
       <text x="${(labelWidth / 2) * 10}" y="${styleConfig.yText}" transform="scale(.1)" fill="${leftTextFill}">${safeLabel}</text>
-      <text aria-hidden="true" x="${(leftX + messageWidth / 2) * 10}" y="${styleConfig.yShadow}" fill="#010101" fill-opacity="0.3" transform="scale(.1)">${safeMessage}</text>
+      <text aria-hidden="true" x="${(leftX + messageWidth / 2) * 10}" y="${styleConfig.yShadow}" fill="#010101" fill-opacity="${plain ? 0 : 0.3}" transform="scale(.1)">${safeMessage}</text>
       <text x="${(leftX + messageWidth / 2) * 10}" y="${styleConfig.yText}" transform="scale(.1)" fill="${rightTextFill}">${safeMessage}</text>
     </g>
   </svg>`

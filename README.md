@@ -121,7 +121,7 @@ Returns an SVG badge and increments the counter for the provided `username`. By 
 | `username` | string | `guest` | GitHub username or custom counter key |
 | `label` | string | `Profile views` | Text shown on the left side of the badge |
 | `color` | string | `0e75b6` | Hex color for the right side of the badge |
-| `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, or `social` |
+| `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, `social`, `pill`, `outline`, `terminal`, or `minimal` |
 | `mode` | string | `unique` | Counting mode: `unique` deduplicates repeat viewers during the TTL window, while `total` increments on every request |
 | `ttl` | number | `21600` | Unique-view deduplication window in seconds, clamped from `60` to `86400` |
 | `preview` | boolean | `false` | When `true`, returns a sample badge without reading or writing Redis |
