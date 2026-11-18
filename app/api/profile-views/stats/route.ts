@@ -1,10 +1,7 @@
-import { Redis } from '@upstash/redis'
+import { getCounterStore } from '@/lib/counter-store'
 import { NextRequest, NextResponse } from 'next/server'
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-})
+export const runtime = 'nodejs'
 
 function sanitizeUsername(value: string | null): string | null {
   const username = value?.trim().toLowerCase()
@@ -19,6 +16,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'A valid username is required.' }, { status: 400 })
   }
 
-  const views = Number((await redis.get<number | string>(`views:${username}`)) || 0)
+  const store = await getCounterStore()
+  const views = await store.get(`views:${username}`)
   return NextResponse.json({ username, views })
 }

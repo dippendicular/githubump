@@ -1,10 +1,7 @@
-import { Redis } from '@upstash/redis'
+import { getCounterStore } from '@/lib/counter-store'
 import { NextRequest, NextResponse } from 'next/server'
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-})
+export const runtime = 'nodejs'
 
 function sanitizeUsername(value: unknown): string | null {
   if (typeof value !== 'string') return null
@@ -35,7 +32,7 @@ export async function POST(request: NextRequest) {
   const counterKey = `views:${username}`
 
   if (action === 'reset') {
-    await redis.set(counterKey, 0)
+    await (await getCounterStore()).set(counterKey, 0)
     return NextResponse.json({ username, views: 0 })
   }
 
@@ -45,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'count must be a non-negative integer.' }, { status: 400 })
     }
 
-    await redis.set(counterKey, views)
+    await (await getCounterStore()).set(counterKey, views)
     return NextResponse.json({ username, views })
   }
 

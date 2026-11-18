@@ -9,6 +9,9 @@ export const BADGE_STYLES = {
   outline: 'Outline',
   terminal: 'Terminal',
   minimal: 'Minimal',
+  ticket: 'Ticket',
+  ledger: 'Ledger',
+  orbit: 'Orbit',
 } as const
 
 export type BadgeStyle = keyof typeof BADGE_STYLES

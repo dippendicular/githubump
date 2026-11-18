@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import StorageGuide from '@/components/storage-guide'
 import {
   ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Monitor, Moon, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
@@ -47,6 +49,7 @@ const FORMATS = [
 type Format = (typeof FORMATS)[number]['value']
 
 export default function BadgeGenerator() {
+  const reduceMotion = useReducedMotion()
   const [settings, setSettings] = useState(DEFAULTS)
   const [origin, setOrigin] = useState('')
   const [surface, setSurface] = useState<Theme>('system')
@@ -158,6 +161,13 @@ export default function BadgeGenerator() {
     setFailedPreview('')
   }
 
+  const cardMotion = (direction: -1 | 1, delay = 0) => ({
+    initial: reduceMotion ? false as const : { x: direction * 14 },
+    animate: { x: 0 },
+    whileHover: reduceMotion ? undefined : { y: -3 },
+    transition: { x: { duration: .38, delay, ease: 'easeOut' as const }, y: { duration: .18 } },
+  })
+
   return (
     <main className="badge-workspace" data-theme={theme}>
       <header className="workspace-bar">
@@ -185,13 +195,8 @@ export default function BadgeGenerator() {
       </header>
 
       <div className="workspace-width workspace-content">
-        <div className="workspace-intro">
-          <h1>Profile views badge</h1>
-          <p>Customize a live view counter for your GitHub profile README.</p>
-        </div>
-
         <div className="workspace-grid">
-          <div className="workspace-card editor">
+          <motion.div className="workspace-card editor" {...cardMotion(-1)}>
             <div className="card-heading">
               <h2><SlidersHorizontal size={18} aria-hidden="true" /> Badge settings</h2>
               <div className="editor-actions">
@@ -268,10 +273,10 @@ export default function BadgeGenerator() {
                 ) : <p className="field-hint">Every badge request adds one view.</p>}
               </fieldset>
             </div>
-          </div>
+          </motion.div>
 
           <div className="workspace-results">
-            <section className="workspace-card">
+            <motion.section className="workspace-card" {...cardMotion(1)}>
               <div className="card-heading">
                 <h2><Eye size={18} aria-hidden="true" /> Live preview</h2>
                 <div className="surface-toggle" role="group" aria-label="Preview background">
@@ -297,9 +302,9 @@ export default function BadgeGenerator() {
                 </div>
                 <p className="preview-caption">Preview uses a sample count.</p>
               </div>
-            </section>
+            </motion.section>
 
-            <section className="workspace-card">
+            <motion.section className="workspace-card" {...cardMotion(1, .08)}>
               <div className="card-heading">
                 <h2><Code2 size={18} aria-hidden="true" /> Embed badge</h2>
               </div>
@@ -320,20 +325,21 @@ export default function BadgeGenerator() {
                   </button>
                 </div>
               </div>
-            </section>
+            </motion.section>
 
             {stats && (
-              <section className="workspace-card">
+              <motion.section className="workspace-card" {...cardMotion(1, .12)}>
                 <div className="card-heading"><h2><UsersRound size={18} aria-hidden="true" /> GitHub stats</h2></div>
                 <dl className="profile-stats">
                   {Object.entries({ Followers: stats.followers, Following: stats.following, 'Public repos': stats.publicRepos, Stars: stats.totalStars }).map(([label, value]) => (
                     <div key={label}><dt>{label}</dt><dd>{formatNumber(value)}</dd></div>
                   ))}
                 </dl>
-              </section>
+              </motion.section>
             )}
           </div>
         </div>
+        <StorageGuide />
       </div>
     </main>
   )
