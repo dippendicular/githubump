@@ -186,6 +186,12 @@ Views are recorded separately by platform. Existing badges without a platform pa
 
 For different usernames, add platform-specific aliases, for example `/views/all/alice?gitlab=alice-dev&codeberg=alice_code`. The editor builds this link using the usernames entered under each platform. The link groups the handles you supply. It does not verify that they belong to the same person.
 
+### Badge fonts and icons
+
+Expand **Appearance** to customize the views badge and, when enabled, the repository badge. Badge styles are in horizontal carousels. Both badges support system font families and 12 bundled Google Fonts, including Inter, Space Grotesk, Playfair Display, and IBM Plex Mono. The Google Fonts are embedded in exported SVGs with a fallback for characters outside their Latin subset.
+
+Search the **Views icon** or **Repository icon** picker for icons across [Font Awesome Free](https://fontawesome.com/license/free) Solid, Regular, and Brands. The full free catalog is searchable. A selected icon is drawn directly in the SVG. The generated links use `font` or `repoFont` for fonts and `icon` or `repoIcon` for icons (for example, `brands:github`).
+
 ## Additional API Endpoints
 
 ### `GET /api/profile-views/stats`

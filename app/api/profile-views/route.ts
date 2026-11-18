@@ -1,3 +1,4 @@
+import { loadBadgeAssets } from '@/lib/badge-assets-server'
 import { formatViewCount } from '@/lib/badge-utils'
 import { getPublicRepositories } from '@/lib/public-repositories'
 import { parsePlatform, platformCounterKey, platformUsername, type Platform } from '@/lib/platforms'
@@ -183,20 +184,23 @@ export async function GET(request: NextRequest) {
       : preview === 'true' ? 1234 : getViews(request, platform, username, mode, ttlSeconds)
 
     const showRepositories = searchParams.get('showRepos') === 'true'
-    const [views, repositories] = await Promise.all([
+    const design = readBadgeDesign(searchParams)
+    const repoBadge = readRepositoryBadge(searchParams)
+    const [views, repositories, assets, repoAssets] = await Promise.all([
       viewCount,
       showRepositories ? getPublicRepositories(platform, username).catch(() => null) : null,
+      loadBadgeAssets(design),
+      showRepositories && repoBadge.design ? loadBadgeAssets(repoBadge.design) : undefined,
     ])
     const requestedFormat = searchParams.get('countFormat')
     const format = requestedFormat === 'exact' || requestedFormat === 'compact' ? requestedFormat : storedPreview ? 'exact' : 'compact'
     const message = formatViewCount(views, format)
-    const design = readBadgeDesign(searchParams)
     const svg = isNewDesign(style) || hasBadgeDesign(design)
-      ? renderBadgeDesign(label, message, `#${color}`, style, design)
+      ? renderBadgeDesign(label, message, `#${color}`, style, design, assets)
       : generateSVG(label, message, color, style)
 
     const order = searchParams.get('repoOrder') === 'repos-first' ? 'repos-first' : 'views-first'
-    return new NextResponse(showRepositories ? withRepositoryBadge(svg, repositories, order, readRepositoryBadge(searchParams)) : svg, {
+    return new NextResponse(showRepositories ? withRepositoryBadge(svg, repositories, order, repoBadge, repoAssets) : svg, {
       headers: {
         'Content-Type': 'image/svg+xml; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',

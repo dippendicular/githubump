@@ -1,3 +1,4 @@
+import type { BadgeAssets } from './badge-assets'
 import { formatNumber } from './badge-utils'
 import { hasBadgeDesign, isNewDesign, readBadgeDesign, renderBadgeDesign, type BadgeDesign } from './badge-design'
 
@@ -20,9 +21,9 @@ export function readRepositoryBadge(params: URLSearchParams): RepositoryBadgeOpt
   }
 }
 
-export function renderRepositoryBadge(count: number | null, options: RepositoryBadgeOptions) {
+export function renderRepositoryBadge(count: number | null, options: RepositoryBadgeOptions, assets?: BadgeAssets) {
   const style = options.style && isNewDesign(options.style) ? options.style : REPOSITORY_STYLE
-  const svg = renderBadgeDesign(labelFor(options.label), count === null ? '—' : formatNumber(count), REPOSITORY_ACCENT, style, options.design ?? {})
+  const svg = renderBadgeDesign(labelFor(options.label), count === null ? '—' : formatNumber(count), REPOSITORY_ACCENT, style, options.design ?? {}, assets)
   // Both nested SVGs share the outer document, so local fragment IDs must differ.
   return svg.replace(/id="([a-z]+)"|(fill|clip-path)="url\(#([a-z]+)\)"/g, (_, id, attr, reference) => id ? `id="repo-${id}"` : `${attr}="url(#repo-${reference})"`)
 }
@@ -32,13 +33,13 @@ function dimensions(svg: string) {
   return match ? { width: Number(match[1]), height: Number(match[2]) } : null
 }
 
-export function withRepositoryBadge(views: string, repositories: number | null, order: RepositoryOrder, options: RepositoryBadgeOptions = {}) {
+export function withRepositoryBadge(views: string, repositories: number | null, order: RepositoryOrder, options: RepositoryBadgeOptions = {}, assets?: BadgeAssets) {
   const size = dimensions(views)
   if (!size) return views
   const { width, height } = size
   const customized = Boolean(options.style || labelFor(options.label) !== 'Public repos' || (options.design && hasBadgeDesign(options.design)))
   if (customized) {
-    const repo = renderRepositoryBadge(repositories, options)
+    const repo = renderRepositoryBadge(repositories, options, assets)
     const repoSize = dimensions(repo)
     if (repoSize) {
       const combinedHeight = Math.max(height, repoSize.height)

@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import BadgeIconPicker from '@/components/badge-icon-picker'
 import ThemedSelect from '@/components/themed-select'
 import { FONTS, SHAPES, type BadgeDesign } from '@/lib/badge-design'
 
@@ -35,6 +36,7 @@ export default function BadgeAppearance({ prefix, design, labelPaint, countPaint
           {design[key] && <button type="button" className="quiet-button" aria-label={`Reset ${name(text).toLowerCase()}`} onClick={() => onChange(key, undefined)}>Auto</button>}
         </div>
       ))}
+      <BadgeIconPicker label={repo ? 'Repository icon' : 'Views icon'} value={design.icon} onChange={(icon) => onChange('icon', icon)} />
     </div>
   )
 }

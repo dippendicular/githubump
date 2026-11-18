@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Moon, Move, RotateCcw, Shuffle,
+  ArrowUpRight, Braces, Check, ChevronDown, Code2, Copy, Eye, Link2, Moon, Move, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
 } from 'lucide-react'
 import { formatViewCount, formatNumber, generateBadgeUrl, generateMarkdownCode, type CountFormat, type CountMode } from '@/lib/badge-utils'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
+import BadgeStyleCarousel from '@/components/badge-style-carousel'
+import { useBadgeAssets } from '@/components/use-badge-assets'
 import BadgeAppearance from '@/components/badge-appearance'
 import ThemedSelect from '@/components/themed-select'
 import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
@@ -108,16 +110,18 @@ export default function BadgeGenerator() {
   }
   const allViewsUrl = `/views/all/${encodeURIComponent(account)}${aliases.size ? `?${aliases}` : ''}`
   const windowSeconds = ttl ? Math.min(86400, Math.max(60, Math.floor(Number(ttl)))) : Number(DEFAULTS.ttl)
+  const viewAssets = useBadgeAssets(design)
+  const repoAssets = useBadgeAssets(repoDesign, showRepos)
   const repositoryBadge = { label: repoLabel, style: repoStyle === 'auto' ? undefined : repoStyle, design: repoDesign }
   const repositoryGeometry = badgeGeometry(repositoryBadge.style ?? REPOSITORY_STYLE, repoDesign, REPOSITORY_ACCENT)
   const options = { repositoryBadge, mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined, countFormat }
   const customPreview = positioning || isNewDesign(style) || hasBadgeDesign(design)
   const geometry = badgeGeometry(style, design, ACCENT)
   const previewLabel = label.trim().slice(0, 48) || DEFAULTS.label
-  const customSvg = customPreview ? renderBadgeDesign(previewLabel, formatViewCount(views?.count ?? null, countFormat), ACCENT, style, design) : undefined
+  const customSvg = customPreview ? renderBadgeDesign(previewLabel, formatViewCount(views?.count ?? null, countFormat), ACCENT, style, design, viewAssets) : undefined
   const previewSvg = positioning === 'repo'
-    ? renderRepositoryBadge(repositoryCount, repositoryBadge)
-    : customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder, repositoryBadge) : customSvg
+    ? renderRepositoryBadge(repositoryCount, repositoryBadge, repoAssets)
+    : customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder, repositoryBadge, repoAssets) : customSvg
   const positionGeometry = positioning === 'repo' ? repositoryGeometry : geometry
   const positionDesign = positioning === 'repo' ? repoDesign : design
   const localPreview = previewSvg ? svgSource(previewSvg) : undefined
@@ -326,51 +330,51 @@ export default function BadgeGenerator() {
 
       <div className="workspace-width workspace-content">
         <div className="workspace-grid">
-          <motion.div className="workspace-card editor" {...cardMotion(-1)}>
-            <div className="card-heading">
-              <h2><SlidersHorizontal size={18} aria-hidden="true" /> Badge settings</h2>
-              <div className="editor-actions">
-                <button type="button" className="quiet-button" onClick={shuffleAppearance}><Shuffle size={15} aria-hidden="true" /> Shuffle</button>
-                <button type="button" className="quiet-button" onClick={reset}><RotateCcw size={15} aria-hidden="true" /> Reset</button>
-              </div>
-            </div>
-
-            <div className="editor-fields">
-              <div className="platform-fields">
-                <div className="field appearance-choice">
-                  <label id="badge-platform-label" htmlFor="badge-platform">Platform</label>
-                  <ThemedSelect id="badge-platform" container={workspace} items={PLATFORMS} value={platform} onChange={(value) => {
-                    setPlatform(value)
-                    setCopyError(false)
-                  }} />
+          <div className="workspace-settings">
+            <motion.div className="workspace-card editor" {...cardMotion(-1)}>
+              <div className="card-heading">
+                <h2><SlidersHorizontal size={18} aria-hidden="true" /> Badge settings</h2>
+                <div className="editor-actions">
+                  <button type="button" className="quiet-button" onClick={shuffleAppearance}><Shuffle size={15} aria-hidden="true" /> Shuffle</button>
+                  <button type="button" className="quiet-button" onClick={reset}><RotateCcw size={15} aria-hidden="true" /> Reset</button>
                 </div>
-                <div className="field">
-                  <label htmlFor="badge-username">Username</label>
-                  <div className="username-input">
-                    <UserRound size={17} aria-hidden="true" />
-                    <input id="badge-username" value={username} onChange={(event) => {
-                      const handle = event.target.value
-                      setHandles((current) => ({ ...current, [platform]: handle }))
+              </div>
+
+              <div className="editor-fields">
+                <div className="platform-fields">
+                  <div className="field appearance-choice">
+                    <label id="badge-platform-label" htmlFor="badge-platform">Platform</label>
+                    <ThemedSelect id="badge-platform" container={workspace} items={PLATFORMS} value={platform} onChange={(value) => {
+                      setPlatform(value)
                       setCopyError(false)
-                    }} autoCapitalize="none" spellCheck={false} maxLength={platform === 'github' ? 39 : 64} placeholder={`${PLATFORMS[platform]} username`} aria-invalid={!validUsername} aria-describedby={!validUsername ? 'username-error' : undefined} />
+                    }} />
                   </div>
-                  {!validUsername && <p id="username-error" className="field-error">Enter a valid {PLATFORMS[platform]} username.</p>}
+                  <div className="field">
+                    <label htmlFor="badge-username">Username</label>
+                    <div className="username-input">
+                      <UserRound size={17} aria-hidden="true" />
+                      <input id="badge-username" value={username} onChange={(event) => {
+                        const handle = event.target.value
+                        setHandles((current) => ({ ...current, [platform]: handle }))
+                        setCopyError(false)
+                      }} autoCapitalize="none" spellCheck={false} maxLength={platform === 'github' ? 39 : 64} placeholder={`${PLATFORMS[platform]} username`} aria-invalid={!validUsername} aria-describedby={!validUsername ? 'username-error' : undefined} />
+                    </div>
+                    {!validUsername && <p id="username-error" className="field-error">Enter a valid {PLATFORMS[platform]} username.</p>}
+                  </div>
                 </div>
-              </div>
 
-              <fieldset className="field repository-settings">
-                <legend>Public repositories</legend>
-                <div className="repo-count-summary">
-                  <p aria-live="polite">{repositoryKey ? (repositoryResult ? (repositoryCount === null ? 'Repository count unavailable' : `${repositoryCount.toLocaleString('en-US')} public repositories`) : 'Looking up public repositories…') : 'Enter a username to look up repositories.'}</p>
-                  {repositoryKey && <a className="preview-open" href={allViewsUrl}>All platform views <ArrowUpRight size={13} aria-hidden="true" /></a>}
-                </div>
-                <label className="checkbox-option"><input type="checkbox" checked={showRepos} onChange={(event) => {
-                  setShowRepos(event.target.checked)
-                  if (!event.target.checked && positioning === 'repo') setPositioning(null)
-                  setCopyError(false)
-                }} /> Show public repositories on badge</label>
-                {showRepos && <div className="repository-customization">
-                  <div className="appearance-grid">
+                <fieldset className="field repository-settings">
+                  <legend>Public repositories</legend>
+                  <div className="repo-count-summary">
+                    <p aria-live="polite">{repositoryKey ? (repositoryResult ? (repositoryCount === null ? 'Repository count unavailable' : `${repositoryCount.toLocaleString('en-US')} public repositories`) : 'Looking up public repositories…') : 'Enter a username to look up repositories.'}</p>
+                    {repositoryKey && <a className="preview-open" href={allViewsUrl}>All platform views <ArrowUpRight size={13} aria-hidden="true" /></a>}
+                  </div>
+                  <label className="checkbox-option"><input type="checkbox" checked={showRepos} onChange={(event) => {
+                    setShowRepos(event.target.checked)
+                    if (!event.target.checked && positioning === 'repo') setPositioning(null)
+                    setCopyError(false)
+                  }} /> Show public repositories on badge</label>
+                  {showRepos && <div className="repository-customization">
                     <div className="appearance-choice">
                       <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
                       <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
@@ -378,90 +382,84 @@ export default function BadgeGenerator() {
                         setCopyError(false)
                       }} />
                     </div>
-                    <div className="appearance-choice">
-                      <label id="repo-style-label" htmlFor="repo-style">Repository style</label>
-                      <ThemedSelect id="repo-style" container={workspace} items={REPO_STYLES} value={repoStyle} onChange={(value) => {
-                        setRepoStyle(value)
+                    <div className="field">
+                      <label htmlFor="repo-label">Repository label</label>
+                      <input id="repo-label" value={repoLabel} placeholder="Public repos" maxLength={48} onChange={(event) => {
+                        setRepoLabel(event.target.value)
                         setCopyError(false)
                       }} />
                     </div>
+                  </div>}
+                </fieldset>
+
+                <div className="field">
+                  <label htmlFor="badge-label">Badge label</label>
+                  <input id="badge-label" value={label} onChange={(event) => update('label', event.target.value)} placeholder="Profile views" maxLength={48} />
+                </div>
+
+                <BadgeStyleCarousel name="badge-style" label="Badge style" styles={BADGE_STYLES}
+                  thumbnails={THUMBNAILS} value={style} onChange={(value) => update('style', value)} reducedMotion={reduceMotion} />
+
+                <fieldset className="field counting-field">
+                  <legend>Counting mode</legend>
+                  <div className="mode-grid">
+                    {MODES.map(({ value, label, icon: Icon }) => (
+                      <label key={value} className="mode-option">
+                        <input type="radio" name="counting-mode" value={value} checked={mode === value} onChange={() => update('mode', value)} />
+                        <Icon size={16} aria-hidden="true" />{label}
+                      </label>
+                    ))}
                   </div>
-                  <div className="field">
-                    <label htmlFor="repo-label">Repository label</label>
-                    <input id="repo-label" value={repoLabel} placeholder="Public repos" maxLength={48} onChange={(event) => {
-                      setRepoLabel(event.target.value)
-                      setCopyError(false)
-                    }} />
-                  </div>
-                  <BadgeAppearance prefix="repo" design={repoDesign} container={workspace}
-                    labelPaint={repoDesign.labelColor ?? repositoryGeometry.recipe.label}
-                    countPaint={repoDesign.countColor ?? repositoryGeometry.recipe.count}
-                    onChange={updateRepoDesign} />
-                </div>}
-              </fieldset>
-
-              <div className="field">
-                <label htmlFor="badge-label">Badge label</label>
-                <input id="badge-label" value={label} onChange={(event) => update('label', event.target.value)} placeholder="Profile views" maxLength={48} />
-              </div>
-
-              <fieldset className="field">
-                <legend>Badge style</legend>
-                <div className="style-grid">
-                  {STYLES.map((value) => (
-                    <label key={value} className="style-option">
-                      <input type="radio" name="badge-style" value={value} checked={style === value} onChange={() => update('style', value)} />
-                      {THUMBNAILS[value] ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img className="style-thumbnail" src={THUMBNAILS[value]} alt="" />
-                      ) : <span className="style-sample" data-style={value} aria-hidden="true"><i /><i /></span>}
-                      <span>{BADGE_STYLES[value]}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="field badge-appearance">
-                <legend>Appearance</legend>
-                <BadgeAppearance prefix="badge" design={design} container={workspace}
-                  labelPaint={labelPaint} countPaint={countPaint} onChange={updateDesign} />
-                <div className="color-swatches count-swatches" role="group" aria-label="Count color presets">
-                  {COLORS.map(([name, value]) => (
-                    <button key={value} type="button" className="color-swatch" style={{ background: value }} aria-label={name} title={name} aria-pressed={countPaint === value} onClick={() => updateDesign('countColor', value)}>
-                      {countPaint === value && <Check size={15} aria-hidden="true" />}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="field counting-field">
-                <legend>Counting mode</legend>
-                <div className="mode-grid">
-                  {MODES.map(({ value, label, icon: Icon }) => (
-                    <label key={value} className="mode-option">
-                      <input type="radio" name="counting-mode" value={value} checked={mode === value} onChange={() => update('mode', value)} />
-                      <Icon size={16} aria-hidden="true" />{label}
-                    </label>
-                  ))}
-                </div>
-                {mode === 'unique' ? (
-                  <div className="ttl-field">
-                    <label htmlFor="badge-ttl">Repeat visit window</label>
-                    <div className="ttl-input">
-                      <input id="badge-ttl" type="number" min={60} max={86400} value={ttl} placeholder={DEFAULTS.ttl} onChange={(event) => update('ttl', event.target.value)} onBlur={() => update('ttl', String(windowSeconds))} aria-describedby="ttl-help" />
-                      <span aria-hidden="true">sec</span>
+                  {mode === 'unique' ? (
+                    <div className="ttl-field">
+                      <label htmlFor="badge-ttl">Repeat visit window</label>
+                      <div className="ttl-input">
+                        <input id="badge-ttl" type="number" min={60} max={86400} value={ttl} placeholder={DEFAULTS.ttl} onChange={(event) => update('ttl', event.target.value)} onBlur={() => update('ttl', String(windowSeconds))} aria-describedby="ttl-help" />
+                        <span aria-hidden="true">sec</span>
+                      </div>
+                      <p id="ttl-help">Repeat visits count once per window. 60–86,400 seconds.</p>
                     </div>
-                    <p id="ttl-help">Repeat visits count once per window. 60–86,400 seconds.</p>
+                  ) : <p className="field-hint">Every badge request adds one view.</p>}
+                  <label className="checkbox-option count-format-option">
+                    <input type="checkbox" checked={countFormat === 'exact'} onChange={(event) => update('countFormat', event.target.checked ? 'exact' : 'compact')} aria-describedby="count-format-help" />
+                    Show full view count
+                  </label>
+                  <p className="field-hint" id="count-format-help">17,654 in full or 17.7K in compact format.</p>
+                </fieldset>
+              </div>
+            </motion.div>
+            <details className="workspace-card appearance-card">
+              <summary className="card-heading">
+                <h2><SlidersHorizontal size={18} aria-hidden="true" /> Appearance</h2>
+                <ChevronDown className="appearance-chevron" size={17} aria-hidden="true" />
+              </summary>
+              <div className="appearance-card-content">
+                <section className="appearance-section" aria-labelledby="views-appearance">
+                  <h3 id="views-appearance">Views badge</h3>
+                  <BadgeAppearance prefix="badge" design={design} container={workspace}
+                    labelPaint={labelPaint} countPaint={countPaint} onChange={updateDesign} />
+                  <div className="color-swatches count-swatches" role="group" aria-label="Count color presets">
+                    {COLORS.map(([name, value]) => (
+                      <button key={value} type="button" className="color-swatch" style={{ background: value }} aria-label={name} title={name} aria-pressed={countPaint === value} onClick={() => updateDesign('countColor', value)}>
+                        {countPaint === value && <Check size={15} aria-hidden="true" />}
+                      </button>
+                    ))}
                   </div>
-                ) : <p className="field-hint">Every badge request adds one view.</p>}
-                <label className="checkbox-option count-format-option">
-                  <input type="checkbox" checked={countFormat === 'exact'} onChange={(event) => update('countFormat', event.target.checked ? 'exact' : 'compact')} aria-describedby="count-format-help" />
-                  Show full view count
-                </label>
-                <p className="field-hint" id="count-format-help">17,654 in full or 17.7K in compact format.</p>
-              </fieldset>
-            </div>
-          </motion.div>
+                </section>
+                {showRepos && (
+                  <section className="appearance-section" aria-labelledby="repo-appearance">
+                    <h3 id="repo-appearance">Repository badge</h3>
+                    <BadgeStyleCarousel name="repo-badge-style" label="Repository style" styles={REPO_STYLES}
+                      thumbnails={THUMBNAILS} value={repoStyle} onChange={(value) => { setRepoStyle(value); setCopyError(false) }} reducedMotion={reduceMotion} />
+                    <BadgeAppearance prefix="repo" design={repoDesign} container={workspace}
+                      labelPaint={repoDesign.labelColor ?? repositoryGeometry.recipe.label}
+                      countPaint={repoDesign.countColor ?? repositoryGeometry.recipe.count}
+                      onChange={updateRepoDesign} />
+                  </section>
+                )}
+              </div>
+            </details>
+          </div>
 
           <div className="workspace-results">
             <motion.section className="workspace-card" {...cardMotion(1)}>

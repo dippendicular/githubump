@@ -1,3 +1,5 @@
+import { GOOGLE_BADGE_FONTS, isBadgeIconKey, isGoogleBadgeFont, type BadgeAssets } from './badge-assets'
+
 export const NEW_DESIGNS = {
   arcade: 'Arcade',
   blueprint: 'Blueprint',
@@ -38,6 +40,7 @@ export const FONTS = {
   slab: 'Slab serif',
   condensed: 'Condensed',
   rounded: 'Rounded',
+  ...GOOGLE_BADGE_FONTS,
 } as const
 
 export type Shape = keyof typeof SHAPES
@@ -46,6 +49,7 @@ export type Point = readonly [number, number]
 export type BadgeDesign = {
   shape?: Shape
   font?: Font
+  icon?: string
   labelColor?: string
   countColor?: string
   labelPosition?: Point
@@ -79,7 +83,9 @@ export function readBadgeDesign(params: URLSearchParams, prefix = ''): BadgeDesi
     return [clampOffset(x), clampOffset(y)]
   }
 
+  const icon = get('icon')
   return {
+    icon: isBadgeIconKey(icon) ? icon : undefined,
     shape: choice(get('shape'), SHAPES),
     font: choice(get('font'), FONTS),
     labelColor: badgeColor(get('labelColor')),
@@ -91,6 +97,7 @@ export function readBadgeDesign(params: URLSearchParams, prefix = ''): BadgeDesi
 
 export function writeBadgeDesign(params: URLSearchParams, design: BadgeDesign, prefix = '') {
   const set = (key: keyof BadgeDesign, value: string) => params.set(designKey(key, prefix), value)
+  if (design.icon) set('icon', design.icon)
   if (design.shape && design.shape !== 'auto') set('shape', design.shape)
   if (design.font && design.font !== 'auto') set('font', design.font)
   if (design.labelColor) set('labelColor', design.labelColor)
@@ -101,7 +108,7 @@ export function writeBadgeDesign(params: URLSearchParams, design: BadgeDesign, p
 
 export function hasBadgeDesign(design: BadgeDesign) {
   return Boolean((design.shape && design.shape !== 'auto') || (design.font && design.font !== 'auto')
-    || design.labelColor || design.countColor || design.labelPosition?.some(Boolean) || design.countPosition?.some(Boolean))
+    || design.icon || design.labelColor || design.countColor || design.labelPosition?.some(Boolean) || design.countPosition?.some(Boolean))
 }
 
 type ShapeName = Exclude<Shape, 'auto'>
@@ -111,7 +118,7 @@ type Recipe = {
   shape: ShapeName
   orientation: Orientation
   pattern?: Pattern
-  font: Exclude<Font, 'auto'>
+  font: keyof typeof FAMILY
   label: string
   count: string
 }
@@ -147,14 +154,14 @@ function recipeFor(style: string, accent: string) {
   return isNewDesign(style) ? RECIPES[style] : { ...BASE, shape: LEGACY_SHAPES[style] ?? BASE.shape, count: accent }
 }
 
-const FAMILY: Record<Exclude<Font, 'auto'>, string> = {
+const FAMILY = {
   sans: 'Arial, Helvetica, sans-serif',
   mono: 'Consolas, DejaVu Sans Mono, monospace',
   serif: 'Georgia, Times New Roman, serif',
   slab: 'Rockwell, Georgia, serif',
   condensed: 'Impact, Arial Narrow, sans-serif',
   rounded: 'Trebuchet MS, Verdana, sans-serif',
-}
+} as const
 
 export function badgeGeometry(style: string, design: BadgeDesign, accent = '#0e75b6') {
   const recipe = recipeFor(style, accent)
@@ -221,11 +228,15 @@ function xml(value: string) {
   return value.replace(/[<>&"']/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[char]!)
 }
 
-export function renderBadgeDesign(label: string, count: string, accent: string, style: string, design: BadgeDesign) {
+export function renderBadgeDesign(label: string, count: string, accent: string, style: string, design: BadgeDesign, assets: BadgeAssets = {}) {
   const { recipe, shape, stacked, width: w, height: h, label: labelPoint, count: countPoint } = badgeGeometry(style, design, accent)
   const left = badgeColor(design.labelColor) ?? recipe.label
   const right = badgeColor(design.countColor) ?? recipe.count
-  const font = design.font && design.font !== 'auto' ? FAMILY[design.font] : FAMILY[recipe.font]
+  const selectedFont = design.font
+  const embedded = isGoogleBadgeFont(selectedFont) && assets.font ? `Badge-${selectedFont}` : null
+  const font = embedded ? `${embedded}, ${FAMILY[recipe.font]}`
+    : selectedFont && selectedFont !== 'auto' && !isGoogleBadgeFont(selectedFont) ? FAMILY[selectedFont] : FAMILY[recipe.font]
+  const fontCss = embedded ? `<style>@font-face{font-family:${embedded};font-style:normal;font-weight:700;src:url(data:font/woff2;base64,${assets.font}) format('woff2')}</style>` : ''
   const split = stacked ? h * .52 : w * .64
   const rightArea = stacked ? `<rect y="${split}" width="${w}" height="${h - split}" fill="${right}"/>`
     : `<rect x="${split}" width="${w - split}" height="${h}" fill="${right}"/>`
@@ -239,15 +250,21 @@ export function renderBadgeDesign(label: string, count: string, accent: string, 
   }
 
   const fillAt = (point: Point) => readable(stacked ? (point[1] >= 52 ? right : left) : (point[0] >= 64 ? right : left))
+  const icon = assets.icon
+  const iconSize = stacked ? 16 : 18
+  const iconX = stacked ? w / 2 : w * .065
+  const iconY = stacked ? h * .13 : h / 2
+  const iconScale = icon ? iconSize / Math.max(icon.width, icon.height) : 0
+  const artwork = icon ? `<g aria-hidden="true" fill="${fillAt([iconX / w * 100, iconY / h * 100])}" transform="translate(${iconX - icon.width * iconScale / 2} ${iconY - icon.height * iconScale / 2}) scale(${iconScale})">${icon.paths.map(path => `<path d="${path}"/>`).join('')}</g>` : ''
   const title = xml(`${label}: ${count}`)
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${title}">
 <title>${title}</title>
-<defs><clipPath id="body">${shapeMarkup(shape, w, h)}</clipPath>
+${fontCss}<defs><clipPath id="body">${shapeMarkup(shape, w, h)}</clipPath>
 <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 1H4" stroke="#000" opacity=".12"/></pattern>
 <linearGradient id="gloss" x2="0" y2="100%"><stop stop-color="white" stop-opacity=".34"/><stop offset=".65" stop-color="white" stop-opacity="0"/></linearGradient></defs>
-<g clip-path="url(#body)"><rect width="${w}" height="${h}" fill="${left}"/>${rightArea}${decorations(recipe.pattern, w, h, stacked, accent)}
+<g clip-path="url(#body)"><rect width="${w}" height="${h}" fill="${left}"/>${rightArea}${decorations(recipe.pattern, w, h, stacked, accent)}${artwork}
 <g font-family="${font}" text-anchor="middle" dominant-baseline="central" font-weight="700">
-${text(label, labelPoint, stacked ? 13 : 15, fillAt(labelPoint), shape === 'diamond' ? w * .55 : stacked ? w * .7 : w * .54)}
+${text(label, labelPoint, stacked ? 13 : 15, fillAt(labelPoint), shape === 'diamond' ? w * .55 : stacked ? w * .7 : w * (icon ? .44 : .54))}
 ${text(count, countPoint, stacked ? 26 : 23, fillAt(countPoint), stacked ? w * .55 : w * .29)}
 </g></g></svg>`
 }
