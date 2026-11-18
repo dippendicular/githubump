@@ -1,24 +1,20 @@
-import { Redis } from '@upstash/redis'
+import { parsePlatform, platformCounterKey, platformUsername } from '@/lib/platforms'
+import { getCounterStore } from '@/lib/counter-store'
 import { NextRequest, NextResponse } from 'next/server'
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-})
-
-function sanitizeUsername(value: string | null): string | null {
-  const username = value?.trim().toLowerCase()
-  if (!username || !/^[a-z0-9-]{1,39}$/.test(username)) return null
-  return username
-}
+export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
-  const username = sanitizeUsername(request.nextUrl.searchParams.get('username'))
+  const { searchParams } = request.nextUrl
+  const requestedPlatform = searchParams.get('platform')
+  const platform = parsePlatform(requestedPlatform)
+  const username = platform && platformUsername(searchParams.get('username'), platform)
 
-  if (!username) {
-    return NextResponse.json({ error: 'A valid username is required.' }, { status: 400 })
+  if (!platform || !username) {
+    return NextResponse.json({ error: 'A valid platform and username are required.' }, { status: 400 })
   }
 
-  const views = Number((await redis.get<number | string>(`views:${username}`)) || 0)
-  return NextResponse.json({ username, views })
+  const store = await getCounterStore()
+  const views = await store.get(platformCounterKey(platform, username))
+  return NextResponse.json(requestedPlatform ? { platform, username, views } : { username, views })
 }

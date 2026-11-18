@@ -1,17 +1,8 @@
-import { Redis } from '@upstash/redis'
+import { parsePlatform, platformCounterKey, platformUsername } from '@/lib/platforms'
+import { getCounterStore } from '@/lib/counter-store'
 import { NextRequest, NextResponse } from 'next/server'
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-})
-
-function sanitizeUsername(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const username = value.trim().toLowerCase()
-  if (!username || !/^[a-z0-9-]{1,39}$/.test(username)) return null
-  return username
-}
+export const runtime = 'nodejs'
 
 function isAuthorized(request: NextRequest): boolean {
   const token = process.env.ADMIN_API_TOKEN
@@ -25,17 +16,18 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null)
-  const username = sanitizeUsername(body?.username)
+  const platform = parsePlatform(body?.platform)
+  const username = platform && platformUsername(body?.username, platform)
   const action = body?.action
 
-  if (!username) {
-    return NextResponse.json({ error: 'A valid username is required.' }, { status: 400 })
+  if (!platform || !username) {
+    return NextResponse.json({ error: 'A valid platform and username are required.' }, { status: 400 })
   }
 
-  const counterKey = `views:${username}`
+  const counterKey = platformCounterKey(platform, username)
 
   if (action === 'reset') {
-    await redis.set(counterKey, 0)
+    await (await getCounterStore()).set(counterKey, 0)
     return NextResponse.json({ username, views: 0 })
   }
 
@@ -45,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'count must be a non-negative integer.' }, { status: 400 })
     }
 
-    await redis.set(counterKey, views)
+    await (await getCounterStore()).set(counterKey, views)
     return NextResponse.json({ username, views })
   }
 

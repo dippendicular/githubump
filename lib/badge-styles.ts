@@ -1,3 +1,5 @@
+import { NEW_DESIGNS } from './badge-design'
+
 export const BADGE_STYLES = {
   flat: 'Flat',
   'flat-square': 'Flat square',
@@ -9,6 +11,10 @@ export const BADGE_STYLES = {
   outline: 'Outline',
   terminal: 'Terminal',
   minimal: 'Minimal',
+  ticket: 'Ticket',
+  ledger: 'Ledger',
+  orbit: 'Orbit',
+  ...NEW_DESIGNS,
 } as const
 
 export type BadgeStyle = keyof typeof BADGE_STYLES
