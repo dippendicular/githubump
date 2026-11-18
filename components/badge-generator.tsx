@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Moon, Move, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
 } from 'lucide-react'
-import { formatNumber, generateBadgeUrl, generateMarkdownCode, type CountMode } from '@/lib/badge-utils'
+import { exactViewCount, formatNumber, generateBadgeUrl, generateMarkdownCode, type CountMode } from '@/lib/badge-utils'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
 import ThemedSelect from '@/components/themed-select'
 import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
@@ -69,6 +69,7 @@ export default function BadgeGenerator() {
   const [handles, setHandles] = useState<Partial<Record<Platform, string>>>({})
   const [showRepos, setShowRepos] = useState(false)
   const [repoOrder, setRepoOrder] = useState<RepositoryOrder>('views-first')
+  const [viewResult, setViewResult] = useState<{ key: string; count: number | null } | null>(null)
   const [repoResult, setRepoResult] = useState<{ key: string; count: number | null } | null>(null)
   const [design, setDesign] = useState<BadgeDesign>({})
   const [positioning, setPositioning] = useState(false)
@@ -85,10 +86,12 @@ export default function BadgeGenerator() {
   const [profile, setProfile] = useState<{ username: string; stats: GitHubStats } | null>(null)
 
   const { label, style, mode, ttl } = settings
-  const username = handles[platform] ?? (platform === 'github' ? 'dipcb05' : '')
+  const username = handles[platform] ?? (platform === 'github' ? 'dippendicular' : '')
   const account = platformUsername(username.trim() || 'guest', platform) ?? 'guest'
   const validUsername = Boolean(platformUsername(username.trim() || 'guest', platform))
-  const repositoryKey = validUsername && username.trim() ? `${platform}/${account}` : ''
+  const viewKey = validUsername ? `${platform}/${account}` : ''
+  const views = viewResult?.key === viewKey ? viewResult : null
+  const repositoryKey = username.trim() ? viewKey : ''
   const repositoryResult = repoResult?.key === repositoryKey ? repoResult : null
   const repositoryCount = repositoryResult?.count ?? null
   const aliases = new URLSearchParams()
@@ -98,11 +101,11 @@ export default function BadgeGenerator() {
   }
   const allViewsUrl = `/views/all/${encodeURIComponent(account)}${aliases.size ? `?${aliases}` : ''}`
   const windowSeconds = ttl ? Math.min(86400, Math.max(60, Math.floor(Number(ttl)))) : Number(DEFAULTS.ttl)
-  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined }
+  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined, countFormat: 'exact' as const }
   const customPreview = positioning || isNewDesign(style) || hasBadgeDesign(design)
   const geometry = badgeGeometry(style, design, ACCENT)
   const previewLabel = label.trim().slice(0, 48) || DEFAULTS.label
-  const customSvg = customPreview ? renderBadgeDesign(previewLabel, formatNumber(1234), ACCENT, style, design) : undefined
+  const customSvg = customPreview ? renderBadgeDesign(previewLabel, exactViewCount(views?.count ?? null), ACCENT, style, design) : undefined
   const previewSvg = customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder) : customSvg
   const localPreview = previewSvg ? svgSource(previewSvg) : undefined
   const previewWidth = Number(previewSvg?.match(/^<svg[^>]* width="(\d+)"/)?.[1] ?? geometry.width)
@@ -111,7 +114,7 @@ export default function BadgeGenerator() {
 
   const badgePath = generateBadgeUrl('', account, label, ACCENT, style, options)
   const badgeUrl = origin ? origin + badgePath : ''
-  const previewUrl = generateBadgeUrl('', account, label, ACCENT, style, { ...options, preview: true })
+  const previewUrl = generateBadgeUrl('', account, label, ACCENT, style, { ...options, preview: 'stored' })
   const stats = platform === 'github' && profile?.username === account ? profile.stats : null
   const outputs = {
     markdown: `![${account} profile views](${badgeUrl})`,
@@ -158,6 +161,28 @@ export default function BadgeGenerator() {
       controller.abort()
     }
   }, [account, platform, username, validUsername])
+
+  useEffect(() => {
+    if (!viewKey) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      let count: number | null = null
+      try {
+        const response = await fetch(`/api/views/${viewKey}`, { signal: controller.signal, cache: 'no-store' })
+        if (response.ok) {
+          const result = await response.json()
+          if (Number.isSafeInteger(result.views) && result.views >= 0) count = result.views
+        }
+      } catch {
+        // The preview shows an unavailable count when storage cannot be reached.
+      }
+      if (!controller.signal.aborted) setViewResult({ key: viewKey, count })
+    }, 250)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [viewKey])
 
   useEffect(() => {
     if (!repositoryKey) return
@@ -407,7 +432,7 @@ export default function BadgeGenerator() {
               </div>
               <div className="preview-area">
                 <div className="preview-surface" data-surface={surface}>
-                  {failedPreview === previewUrl && !localPreview ? <button type="button" className="quiet-button retry-preview" onClick={() => setFailedPreview('')}>Retry preview</button> : (
+                  {!validUsername ? <span className="preview-caption">No account selected</span> : failedPreview === previewUrl && !localPreview ? <button type="button" className="quiet-button retry-preview" onClick={() => setFailedPreview('')}>Retry preview</button> : (
                     <div className={customPreview ? "badge-preview-image is-custom" : "badge-preview-image"} style={customPreview ? { '--preview-width': `${previewWidth * zoom / 100}px` } as CSSProperties : undefined}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={localPreview ?? previewUrl} style={customPreview ? undefined : { zoom: zoom / 100 }} alt={`${previewLabel} badge preview`} onError={() => setFailedPreview(previewUrl)} />
@@ -423,7 +448,7 @@ export default function BadgeGenerator() {
                     <input type="range" min={100} max={200} step={10} value={zoom} onChange={(event) => setZoom(Number(event.target.value))} />
                     <output aria-hidden="true">{zoom}%</output>
                   </label>
-                  <a className="preview-open" href={previewUrl} target="_blank" rel="noreferrer">Open sample SVG <ArrowUpRight size={13} aria-hidden="true" /></a>
+                  {validUsername && <a className="preview-open" href={previewUrl} target="_blank" rel="noreferrer">Open preview SVG <ArrowUpRight size={13} aria-hidden="true" /></a>}
                 </div>
                 <div className="preview-position-actions">
                   <button type="button" className="quiet-button" aria-pressed={positioning} onClick={() => setPositioning(!positioning)}><Move size={15} aria-hidden="true" /> {positioning ? 'Done moving' : 'Move label & count'}</button>
@@ -433,7 +458,9 @@ export default function BadgeGenerator() {
                   }}>Reset positions</button>}
                 </div>
                 {positioning && <p className="preview-caption" id="position-help">Drag a handle or use the arrow keys. Hold Shift to move faster.</p>}
-                <p className="preview-caption">Preview uses a sample count.</p>
+                <p className="preview-caption" aria-live="polite">
+                  {!validUsername ? 'Enter a valid username to load views.' : !views ? 'Loading views…' : views.count === null ? 'Stored view count unavailable.' : 'Stored views. Preview requests do not add views.'}
+                </p>
               </div>
             </motion.section>
 

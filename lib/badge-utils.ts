@@ -7,10 +7,15 @@ export type CountMode = 'unique' | 'total'
 export interface BadgeUrlOptions {
   mode?: CountMode
   ttl?: number
-  preview?: boolean
+  preview?: boolean | 'stored'
+  countFormat?: 'exact'
   design?: BadgeDesign
   platform?: Platform
   repositories?: RepositoryOrder
+}
+
+export function exactViewCount(count: number | null): string {
+  return count === null ? '—' : count.toLocaleString('en-US')
 }
 
 export function formatNumber(num: number): string {
@@ -40,9 +45,10 @@ export function generateBadgeUrl(
   }
 
   if (options.preview) {
-    params.set('preview', 'true')
+    params.set('preview', options.preview === 'stored' ? 'stored' : 'true')
   }
 
+  if (options.countFormat) params.set('countFormat', options.countFormat)
   if (options.platform && options.platform !== 'github') params.set('platform', options.platform)
   if (options.repositories) {
     params.set('showRepos', 'true')

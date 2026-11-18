@@ -1,3 +1,4 @@
+import { exactViewCount, formatNumber } from '@/lib/badge-utils'
 import { getPublicRepositories } from '@/lib/public-repositories'
 import { parsePlatform, platformCounterKey, platformUsername, type Platform } from '@/lib/platforms'
 import { withRepositoryBadge } from '@/lib/repository-badge'
@@ -37,12 +38,6 @@ const DEFAULT_COLOR = '0e75b6'
 const DEFAULT_TTL_SECONDS = 21600
 const MIN_TTL_SECONDS = 60
 const MAX_TTL_SECONDS = 86400
-
-function formatNumber(num: number): string {
-  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
-  return num.toString()
-}
 
 function escapeXml(value: string): string {
   return value
@@ -181,14 +176,18 @@ export async function GET(request: NextRequest) {
     const style = sanitizeStyle(searchParams.get('style'))
     const mode = sanitizeMode(searchParams.get('mode'))
     const ttlSeconds = sanitizeTtl(searchParams.get('ttl'))
-    const isPreview = searchParams.get('preview') === 'true'
+    const preview = searchParams.get('preview')
+    const storedPreview = preview === 'stored'
+    const viewCount = storedPreview
+      ? getCounterStore().then((store) => store.get(platformCounterKey(platform, username))).catch(() => null)
+      : preview === 'true' ? 1234 : getViews(request, platform, username, mode, ttlSeconds)
 
     const showRepositories = searchParams.get('showRepos') === 'true'
     const [views, repositories] = await Promise.all([
-      isPreview ? 1234 : getViews(request, platform, username, mode, ttlSeconds),
+      viewCount,
       showRepositories ? getPublicRepositories(platform, username).catch(() => null) : null,
     ])
-    const message = formatNumber(views)
+    const message = storedPreview || searchParams.get('countFormat') === 'exact' || views === null ? exactViewCount(views) : formatNumber(views)
     const design = readBadgeDesign(searchParams)
     const svg = isNewDesign(style) || hasBadgeDesign(design)
       ? renderBadgeDesign(label, message, `#${color}`, style, design)

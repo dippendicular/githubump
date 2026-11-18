@@ -148,14 +148,15 @@ Returns an SVG badge and increments the counter for the provided `username`. By 
 | `font` | string | design default | `sans`, `mono`, `serif`, `slab`, `condensed`, or `rounded` |
 | `labelColor`, `countColor` | hex color | design defaults | Background colors of the label and count regions |
 | `labelPosition`, `countPosition` | `x,y` | `0,0` | Signed offsets as percentages of the badge width and height, limited to −25 to 25 per axis |
-| `preview` | boolean | `false` | When `true`, returns a sample badge without reading or writing the counter database |
+| `preview` | string | omitted | `stored` shows the exact stored count without incrementing it. `true` shows a sample count. |
+| `countFormat` | string | compact | Use `exact` to show the full number on a live badge. The editor includes this option in generated links. |
 
 In the editor, choose a design, set its font, shape, and two background colors, then use **Move label & count** to drag the text in the preview. You can also focus a handle and use the arrow keys. **Reset positions** returns the text to the design defaults. The generated Markdown, HTML, and URL include the appearance settings.
 
 Example:
 
 ```text
-/api/profile-views?username=dipcb05&label=Profile%20views&color=0e75b6&style=flat&mode=unique&ttl=21600
+/api/profile-views?username=dippendicular&label=Profile%20views&color=0e75b6&style=flat&mode=unique&ttl=21600
 ```
 
 The API response uses:
@@ -189,13 +190,13 @@ For different usernames, add platform-specific aliases, for example `/views/all/
 Returns the stored counter value as JSON without incrementing it.
 
 ```text
-/api/profile-views/stats?username=dipcb05
+/api/profile-views/stats?username=dippendicular
 ```
 
 Example response:
 
 ```json
-{ "username": "dipcb05", "views": 1234 }
+{ "username": "dippendicular", "views": 1234 }
 ```
 
 ### `POST /api/profile-views/admin`
@@ -208,7 +209,7 @@ Reset a counter:
 curl -X POST https://yourdomain.com/api/profile-views/admin \
   -H "Authorization: Bearer $ADMIN_API_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"username":"dipcb05","action":"reset"}'
+  -d '{"username":"dippendicular","action":"reset"}'
 ```
 
 Set a counter:
@@ -217,7 +218,7 @@ Set a counter:
 curl -X POST https://yourdomain.com/api/profile-views/admin \
   -H "Authorization: Bearer $ADMIN_API_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"username":"dipcb05","action":"set","count":1000}'
+  -d '{"username":"dippendicular","action":"set","count":1000}'
 ```
 
 ### `GET /api/github-stats`
@@ -225,7 +226,7 @@ curl -X POST https://yourdomain.com/api/profile-views/admin \
 Returns optional GitHub profile stats as JSON for the badge generator UI. It uses `GITHUB_API_TOKEN` on the server so the token is not exposed to browser code.
 
 ```text
-/api/github-stats?username=dipcb05
+/api/github-stats?username=dippendicular
 ```
 
 ## GitHub Stats
@@ -300,7 +301,7 @@ public/
 
 ## Troubleshooting
 
-If the badge returns an error, check that the selected backend’s variables and connection are correct. The sample preview works without storage.
+If the badge returns an error, check that the selected backend’s variables and connection are correct. The editor preview reads the current count without adding a view. Use `preview=true` for a sample independent of storage.
 
 If the badge works locally but not in a GitHub README, make sure the deployed URL is public and returns an SVG when opened directly in the browser.
 
