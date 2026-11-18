@@ -148,8 +148,8 @@ Returns an SVG badge and increments the counter for the provided `username`. By 
 | `font` | string | design default | `sans`, `mono`, `serif`, `slab`, `condensed`, or `rounded` |
 | `labelColor`, `countColor` | hex color | design defaults | Background colors of the label and count regions |
 | `labelPosition`, `countPosition` | `x,y` | `0,0` | Signed offsets as percentages of the badge width and height, limited to −25 to 25 per axis |
-| `preview` | string | omitted | `stored` shows the exact stored count without incrementing it. `true` shows a sample count. |
-| `countFormat` | string | compact | Use `exact` to show the full number on a live badge. The editor includes this option in generated links. |
+| `preview` | string | omitted | `stored` shows the stored count without incrementing it, using full numbers by default. `true` shows a sample count. |
+| `countFormat` | string | compact | Use `exact` for full numbers (17,654) or `compact` for abbreviated numbers (17.7K). The editor’s **Show full view count** checkbox sets this option for previews and embeds. |
 
 In the editor, choose a design, set its font, shape, and two background colors, then use **Move label & count** to drag the text in the preview. You can also focus a handle and use the arrow keys. **Reset positions** returns the text to the design defaults. The generated Markdown, HTML, and URL include the appearance settings.
 

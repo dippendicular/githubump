@@ -1,4 +1,4 @@
-import { exactViewCount, formatNumber } from '@/lib/badge-utils'
+import { formatViewCount } from '@/lib/badge-utils'
 import { getPublicRepositories } from '@/lib/public-repositories'
 import { parsePlatform, platformCounterKey, platformUsername, type Platform } from '@/lib/platforms'
 import { withRepositoryBadge } from '@/lib/repository-badge'
@@ -187,7 +187,9 @@ export async function GET(request: NextRequest) {
       viewCount,
       showRepositories ? getPublicRepositories(platform, username).catch(() => null) : null,
     ])
-    const message = storedPreview || searchParams.get('countFormat') === 'exact' || views === null ? exactViewCount(views) : formatNumber(views)
+    const requestedFormat = searchParams.get('countFormat')
+    const format = requestedFormat === 'exact' || requestedFormat === 'compact' ? requestedFormat : storedPreview ? 'exact' : 'compact'
+    const message = formatViewCount(views, format)
     const design = readBadgeDesign(searchParams)
     const svg = isNewDesign(style) || hasBadgeDesign(design)
       ? renderBadgeDesign(label, message, `#${color}`, style, design)

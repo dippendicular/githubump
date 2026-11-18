@@ -376,8 +376,10 @@
 .repository-settings legend { padding-right: 10px; }
 .repo-count-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
 .repo-count-summary p { font-size: 13px; color: var(--secondary-ink); }
-.field > .repository-check { display: flex; align-items: center; gap: 8px; }
-.badge-workspace .repository-check input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--button-bg); cursor: pointer; }
+.field > .checkbox-option { display: flex; align-items: center; gap: 8px; }
+.badge-workspace .checkbox-option input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--button-bg); cursor: pointer; }
+.field > .count-format-option { margin-top: 13px; margin-bottom: 3px; }
+.count-format-option + .field-hint { margin-top: 0; }
 .repository-order { max-width: 230px; margin-top: 10px; }
 .all-views-page { max-width: 650px; }
 .all-views-page > a { margin-bottom: 15px; }

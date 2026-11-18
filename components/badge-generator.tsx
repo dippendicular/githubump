@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Braces, Check, Code2, Copy, Eye, Link2, Moon, Move, RotateCcw, Shuffle,
   SlidersHorizontal, Sun, UserRound, UsersRound,
 } from 'lucide-react'
-import { exactViewCount, formatNumber, generateBadgeUrl, generateMarkdownCode, type CountMode } from '@/lib/badge-utils'
+import { formatViewCount, formatNumber, generateBadgeUrl, generateMarkdownCode, type CountFormat, type CountMode } from '@/lib/badge-utils'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
 import ThemedSelect from '@/components/themed-select'
 import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
@@ -19,6 +19,7 @@ const DEFAULTS = {
   label: 'Profile views',
   style: 'flat' as BadgeStyle,
   mode: 'unique' as CountMode,
+  countFormat: 'exact' as CountFormat,
   ttl: '21600',
 }
 
@@ -85,7 +86,7 @@ export default function BadgeGenerator() {
   const [failedPreview, setFailedPreview] = useState('')
   const [profile, setProfile] = useState<{ username: string; stats: GitHubStats } | null>(null)
 
-  const { label, style, mode, ttl } = settings
+  const { label, style, mode, ttl, countFormat } = settings
   const username = handles[platform] ?? (platform === 'github' ? 'dippendicular' : '')
   const account = platformUsername(username.trim() || 'guest', platform) ?? 'guest'
   const validUsername = Boolean(platformUsername(username.trim() || 'guest', platform))
@@ -101,11 +102,11 @@ export default function BadgeGenerator() {
   }
   const allViewsUrl = `/views/all/${encodeURIComponent(account)}${aliases.size ? `?${aliases}` : ''}`
   const windowSeconds = ttl ? Math.min(86400, Math.max(60, Math.floor(Number(ttl)))) : Number(DEFAULTS.ttl)
-  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined, countFormat: 'exact' as const }
+  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined, countFormat }
   const customPreview = positioning || isNewDesign(style) || hasBadgeDesign(design)
   const geometry = badgeGeometry(style, design, ACCENT)
   const previewLabel = label.trim().slice(0, 48) || DEFAULTS.label
-  const customSvg = customPreview ? renderBadgeDesign(previewLabel, exactViewCount(views?.count ?? null), ACCENT, style, design) : undefined
+  const customSvg = customPreview ? renderBadgeDesign(previewLabel, formatViewCount(views?.count ?? null, countFormat), ACCENT, style, design) : undefined
   const previewSvg = customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder) : customSvg
   const localPreview = previewSvg ? svgSource(previewSvg) : undefined
   const previewWidth = Number(previewSvg?.match(/^<svg[^>]* width="(\d+)"/)?.[1] ?? geometry.width)
@@ -337,7 +338,7 @@ export default function BadgeGenerator() {
                   <p aria-live="polite">{repositoryKey ? (repositoryResult ? (repositoryCount === null ? 'Repository count unavailable' : `${repositoryCount.toLocaleString('en-US')} public repositories`) : 'Looking up public repositories…') : 'Enter a username to look up repositories.'}</p>
                   {repositoryKey && <a className="preview-open" href={allViewsUrl}>All platform views <ArrowUpRight size={13} aria-hidden="true" /></a>}
                 </div>
-                <label className="repository-check"><input type="checkbox" checked={showRepos} onChange={(event) => { setShowRepos(event.target.checked); setCopyError(false) }} /> Show public repositories on badge</label>
+                <label className="checkbox-option"><input type="checkbox" checked={showRepos} onChange={(event) => { setShowRepos(event.target.checked); setCopyError(false) }} /> Show public repositories on badge</label>
                 {showRepos && <div className="appearance-choice repository-order">
                   <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
                   <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
@@ -417,6 +418,11 @@ export default function BadgeGenerator() {
                     <p id="ttl-help">Repeat visits count once per window. 60–86,400 seconds.</p>
                   </div>
                 ) : <p className="field-hint">Every badge request adds one view.</p>}
+                <label className="checkbox-option count-format-option">
+                  <input type="checkbox" checked={countFormat === 'exact'} onChange={(event) => update('countFormat', event.target.checked ? 'exact' : 'compact')} aria-describedby="count-format-help" />
+                  Show full view count
+                </label>
+                <p className="field-hint" id="count-format-help">17,654 in full or 17.7K in compact format.</p>
               </fieldset>
             </div>
           </motion.div>

@@ -3,19 +3,21 @@ import type { RepositoryOrder } from './repository-badge'
 import type { BadgeDesign } from './badge-design'
 
 export type CountMode = 'unique' | 'total'
+export type CountFormat = 'exact' | 'compact'
 
 export interface BadgeUrlOptions {
   mode?: CountMode
   ttl?: number
   preview?: boolean | 'stored'
-  countFormat?: 'exact'
+  countFormat?: CountFormat
   design?: BadgeDesign
   platform?: Platform
   repositories?: RepositoryOrder
 }
 
-export function exactViewCount(count: number | null): string {
-  return count === null ? '—' : count.toLocaleString('en-US')
+export function formatViewCount(count: number | null, format: CountFormat): string {
+  if (count === null) return '—'
+  return format === 'exact' ? count.toLocaleString('en-US') : formatNumber(count)
 }
 
 export function formatNumber(num: number): string {
