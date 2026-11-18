@@ -10,10 +10,11 @@ import { formatNumber, generateBadgeUrl, generateMarkdownCode, type CountMode } 
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
 import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
 import { badgeGeometry, FONTS, hasBadgeDesign, isNewDesign, renderBadgeDesign, SHAPES, type BadgeDesign, type Font, type Point, type Shape } from '@/lib/badge-design'
+import { PLATFORMS, PLATFORM_IDS, platformUsername, type Platform } from '@/lib/platforms'
+import { withRepositoryBadge, type RepositoryOrder } from '@/lib/repository-badge'
 import type { GitHubStats } from '@/lib/github-stats'
 
 const DEFAULTS = {
-  username: 'dipcb05',
   label: 'Profile views',
   style: 'flat' as BadgeStyle,
   mode: 'unique' as CountMode,
@@ -57,6 +58,11 @@ type Format = (typeof FORMATS)[number]['value']
 export default function BadgeGenerator() {
   const reduceMotion = useReducedMotion()
   const [settings, setSettings] = useState(DEFAULTS)
+  const [platform, setPlatform] = useState<Platform>('github')
+  const [handles, setHandles] = useState<Partial<Record<Platform, string>>>({})
+  const [showRepos, setShowRepos] = useState(false)
+  const [repoOrder, setRepoOrder] = useState<RepositoryOrder>('views-first')
+  const [repoResult, setRepoResult] = useState<{ key: string; count: number | null } | null>(null)
   const [design, setDesign] = useState<BadgeDesign>({})
   const [positioning, setPositioning] = useState(false)
   const [origin, setOrigin] = useState('')
@@ -69,22 +75,35 @@ export default function BadgeGenerator() {
   const [failedPreview, setFailedPreview] = useState('')
   const [profile, setProfile] = useState<{ username: string; stats: GitHubStats } | null>(null)
 
-  const { username, label, style, mode, ttl } = settings
-  const account = username.trim().toLowerCase() || 'guest'
-  const validUsername = /^[a-z0-9-]{1,39}$/.test(account)
+  const { label, style, mode, ttl } = settings
+  const username = handles[platform] ?? (platform === 'github' ? 'dipcb05' : '')
+  const account = platformUsername(username.trim() || 'guest', platform) ?? 'guest'
+  const validUsername = Boolean(platformUsername(username.trim() || 'guest', platform))
+  const repositoryKey = validUsername && username.trim() ? `${platform}/${account}` : ''
+  const repositoryResult = repoResult?.key === repositoryKey ? repoResult : null
+  const repositoryCount = repositoryResult?.count ?? null
+  const aliases = new URLSearchParams()
+  for (const id of PLATFORM_IDS) {
+    const handle = platformUsername(handles[id], id)
+    if (handle && handle !== account) aliases.set(id, handle)
+  }
+  const allViewsUrl = `/views/all/${encodeURIComponent(account)}${aliases.size ? `?${aliases}` : ''}`
   const windowSeconds = ttl ? Math.min(86400, Math.max(60, Math.floor(Number(ttl)))) : Number(DEFAULTS.ttl)
-  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design }
+  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined }
   const customPreview = positioning || isNewDesign(style) || hasBadgeDesign(design)
   const geometry = badgeGeometry(style, design, ACCENT)
   const previewLabel = label.trim().slice(0, 48) || DEFAULTS.label
-  const localPreview = customPreview ? svgSource(renderBadgeDesign(previewLabel, formatNumber(1234), ACCENT, style, design)) : undefined
+  const customSvg = customPreview ? renderBadgeDesign(previewLabel, formatNumber(1234), ACCENT, style, design) : undefined
+  const previewSvg = customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder) : customSvg
+  const localPreview = previewSvg ? svgSource(previewSvg) : undefined
+  const previewWidth = Number(previewSvg?.match(/^<svg[^>]* width="(\d+)"/)?.[1] ?? geometry.width)
   const countPaint = design.countColor ?? geometry.recipe.count
   const labelPaint = design.labelColor ?? geometry.recipe.label
 
   const badgePath = generateBadgeUrl('', account, label, ACCENT, style, options)
   const badgeUrl = origin ? origin + badgePath : ''
-  const previewUrl = generateBadgeUrl('', validUsername ? account : 'guest', label, ACCENT, style, { preview: true, design })
-  const stats = profile?.username === account ? profile.stats : null
+  const previewUrl = generateBadgeUrl('', account, label, ACCENT, style, { ...options, preview: true })
+  const stats = platform === 'github' && profile?.username === account ? profile.stats : null
   const outputs = {
     markdown: `![${account} profile views](${badgeUrl})`,
     html: generateMarkdownCode(badgeUrl, account),
@@ -105,7 +124,7 @@ export default function BadgeGenerator() {
   }, [])
 
   useEffect(() => {
-    if (!validUsername || !username.trim()) return
+    if (platform !== 'github' || !validUsername || !username.trim()) return
     const controller = new AbortController()
     const timer = window.setTimeout(async () => {
       try {
@@ -124,7 +143,29 @@ export default function BadgeGenerator() {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [account, username, validUsername])
+  }, [account, platform, username, validUsername])
+
+  useEffect(() => {
+    if (!repositoryKey) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      let count: number | null = null
+      try {
+        const response = await fetch(`/api/public-repositories/${repositoryKey}`, { signal: controller.signal })
+        if (response.ok) {
+          const result = await response.json()
+          if (Number.isSafeInteger(result.publicRepositories) && result.publicRepositories >= 0) count = result.publicRepositories
+        }
+      } catch {
+        // The view count remains available when the platform API cannot be reached.
+      }
+      if (!controller.signal.aborted) setRepoResult({ key: repositoryKey, count })
+    }, 350)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [repositoryKey])
 
   useEffect(() => {
     if (!copied) return
@@ -173,6 +214,10 @@ export default function BadgeGenerator() {
 
   function reset() {
     setDesign({})
+    setPlatform('github')
+    setHandles({})
+    setShowRepos(false)
+    setRepoOrder('views-first')
     setPositioning(false)
     setSettings(DEFAULTS)
     setCopyError(false)
@@ -194,7 +239,7 @@ export default function BadgeGenerator() {
           <div className="workspace-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/github-counter-mark.webp" width="36" height="36" alt="" />
-            <span>GitHub <strong>Counter</strong></span>
+            <span>git<strong>hubump</strong></span>
           </div>
           <div className="bar-actions">
             <div className="surface-toggle site-theme" role="group" aria-label="Site theme">
@@ -225,14 +270,45 @@ export default function BadgeGenerator() {
             </div>
 
             <div className="editor-fields">
-              <div className="field">
-                <label htmlFor="badge-username">GitHub username</label>
-                <div className="username-input">
-                  <UserRound size={17} aria-hidden="true" />
-                  <input id="badge-username" value={username} onChange={(event) => update('username', event.target.value)} autoCapitalize="none" spellCheck={false} maxLength={39} placeholder="guest" aria-invalid={!validUsername} aria-describedby={!validUsername ? 'username-error' : undefined} />
+              <div className="platform-fields">
+                <div className="field appearance-choice">
+                  <label htmlFor="badge-platform">Platform</label>
+                  <select id="badge-platform" value={platform} onChange={(event) => {
+                    setPlatform(event.target.value as Platform)
+                    setCopyError(false)
+                  }}>
+                    {PLATFORM_IDS.map((id) => <option key={id} value={id}>{PLATFORMS[id]}</option>)}
+                  </select>
                 </div>
-                {!validUsername && <p id="username-error" className="field-error">Use only letters, numbers, and hyphens.</p>}
+                <div className="field">
+                  <label htmlFor="badge-username">Username</label>
+                  <div className="username-input">
+                    <UserRound size={17} aria-hidden="true" />
+                    <input id="badge-username" value={username} onChange={(event) => {
+                      const handle = event.target.value
+                      setHandles((current) => ({ ...current, [platform]: handle }))
+                      setCopyError(false)
+                    }} autoCapitalize="none" spellCheck={false} maxLength={platform === 'github' ? 39 : 64} placeholder={`${PLATFORMS[platform]} username`} aria-invalid={!validUsername} aria-describedby={!validUsername ? 'username-error' : undefined} />
+                  </div>
+                  {!validUsername && <p id="username-error" className="field-error">Enter a valid {PLATFORMS[platform]} username.</p>}
+                </div>
               </div>
+
+              <fieldset className="field repository-settings">
+                <legend>Public repositories</legend>
+                <div className="repo-count-summary">
+                  <p aria-live="polite">{repositoryKey ? (repositoryResult ? (repositoryCount === null ? 'Repository count unavailable' : `${repositoryCount.toLocaleString('en-US')} public repositories`) : 'Looking up public repositories…') : 'Enter a username to look up repositories.'}</p>
+                  {repositoryKey && <a className="preview-open" href={allViewsUrl}>All platform views <ArrowUpRight size={13} aria-hidden="true" /></a>}
+                </div>
+                <label className="repository-check"><input type="checkbox" checked={showRepos} onChange={(event) => { setShowRepos(event.target.checked); setCopyError(false) }} /> Show public repositories on badge</label>
+                {showRepos && <div className="appearance-choice repository-order">
+                  <label htmlFor="repo-order">Badge order</label>
+                  <select id="repo-order" value={repoOrder} onChange={(event) => { setRepoOrder(event.target.value as RepositoryOrder); setCopyError(false) }}>
+                    <option value="views-first">Views first</option>
+                    <option value="repos-first">Repositories first</option>
+                  </select>
+                </div>}
+              </fieldset>
 
               <div className="field">
                 <label htmlFor="badge-label">Badge label</label>
@@ -325,7 +401,7 @@ export default function BadgeGenerator() {
               <div className="preview-area">
                 <div className="preview-surface" data-surface={surface}>
                   {failedPreview === previewUrl && !localPreview ? <button type="button" className="quiet-button retry-preview" onClick={() => setFailedPreview('')}>Retry preview</button> : (
-                    <div className={customPreview ? "badge-preview-image is-custom" : "badge-preview-image"} style={customPreview ? { '--preview-width': `${geometry.width * zoom / 100}px` } as CSSProperties : undefined}>
+                    <div className={customPreview ? "badge-preview-image is-custom" : "badge-preview-image"} style={customPreview ? { '--preview-width': `${previewWidth * zoom / 100}px` } as CSSProperties : undefined}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={localPreview ?? previewUrl} style={customPreview ? undefined : { zoom: zoom / 100 }} alt={`${previewLabel} badge preview`} onError={() => setFailedPreview(previewUrl)} />
                       {positioning && <BadgePositionEditor label={geometry.label} count={geometry.count}
@@ -366,7 +442,7 @@ export default function BadgeGenerator() {
                     </button>
                   ))}
                 </div>
-                <textarea className="embed-code" aria-label={`${format.toUpperCase()} embed code`} readOnly value={output} placeholder={validUsername ? 'Preparing badge link…' : 'Enter a valid GitHub username.'} rows={4} spellCheck={false} onFocus={(event) => event.currentTarget.select()} />
+                <textarea className="embed-code" aria-label={`${format.toUpperCase()} embed code`} readOnly value={output} placeholder={validUsername ? 'Preparing badge link…' : 'Enter a valid platform username.'} rows={4} spellCheck={false} onFocus={(event) => event.currentTarget.select()} />
                 <div className="embed-actions">
                   <p aria-live="polite">{copyError ? 'Select the text to copy it manually.' : isCopied ? 'Copied to clipboard.' : format === 'url' ? 'Direct link to the live SVG.' : 'Paste into your profile README.'}</p>
                   <button type="button" className="copy-button" disabled={!output} onClick={copyOutput}>

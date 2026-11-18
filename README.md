@@ -1,8 +1,8 @@
-# GitHub Counter
+# githubump
 
-A self-hosted GitHub profile view counter and customizable README badge generator built with Next.js and TypeScript.
+A self-hosted profile view counter for GitHub, GitLab, Forgejo, Gitea, and Codeberg and customizable README badge generator built with Next.js and TypeScript.
 
-githubvisitcounter lets you run your own profile view badge service instead of depending on a third-party counter. It exposes a lightweight SVG badge endpoint, stores counts in your chosen database, and includes a polished web UI for generating badge URLs and copy-ready HTML.
+githubump lets you run your own profile view badge service instead of depending on a third-party counter. It exposes a lightweight SVG badge endpoint, stores counts in your chosen database, and includes a polished web UI for generating badge URLs and copy-ready HTML.
 
 ## Features
 
@@ -135,7 +135,10 @@ Returns an SVG badge and increments the counter for the provided `username`. By 
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `username` | string | `guest` | GitHub username or custom counter key |
+| `username` | string | `guest` | Username on the selected platform |
+| `platform` | string | `github` | `github`, `gitlab`, `forgejo`, `gitea`, or `codeberg` |
+| `showRepos` | boolean | `false` | Add the platform’s public repository count |
+| `repoOrder` | string | `views-first` | Use `repos-first` to show repositories before views |
 | `label` | string | `Profile views` | Text shown on the left side of the badge |
 | `color` | string | `0e75b6` | Hex color for the right side of the badge |
 | `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, `social`, `pill`, `outline`, `terminal`, `minimal`, `ticket`, `ledger`, `orbit`, `arcade`, `blueprint`, `split`, `stamp`, `seal`, `stack`, `meter`, `ribbon`, `crest`, `marquee`, `glass`, `circuit`, `prism`, or `receipt` |
@@ -163,6 +166,22 @@ The API response uses:
 The no-cache headers help keep the displayed counter fresh when the badge is requested. Use `mode=total` only when you intentionally want every request, refresh, and image reload to increment the badge.
 
 
+## Platforms and repository counts
+
+Choose a platform and enter its username. The editor shows the platform’s public repository count. Enable **Show public repositories on badge** to include it, and choose **Views first** or **Repositories first**. If the provider is unavailable, the badge displays a dash for repositories and still shows views.
+
+GitHub and GitLab lookups use their public APIs. Codeberg uses `https://codeberg.org`. Forgejo and Gitea use `https://code.forgejo.org` and `https://gitea.com` by default. To look up repositories on a different instance, set `FORGEJO_URL` or `GITEA_URL` to that instance’s base URL on the server. Each deployment tracks one instance per platform. `GITHUB_API_TOKEN` is optional for public repository counts and increases the available GitHub API quota.
+
+Views are recorded separately by platform. Existing badges without a platform parameter keep using their original GitHub counters. A badge counts requests to its URL, including when embedded in a README. The read-only endpoints below leave counts alone.
+
+| Route | Result |
+| --- | --- |
+| `GET /api/views/gitlab/alice` | JSON with the platform, username, and stored view count |
+| `GET /api/public-repositories/codeberg/alice` | JSON with the platform, username, and current public repository count |
+| `GET /views/all/alice` | A page with views for `alice` on all five platforms and the total |
+
+For different usernames, add platform-specific aliases, for example `/views/all/alice?gitlab=alice-dev&codeberg=alice_code`. The editor builds this link using the usernames entered under each platform. The link groups the handles you supply. It does not verify that they belong to the same person.
+
 ## Additional API Endpoints
 
 ### `GET /api/profile-views/stats`
@@ -181,7 +200,7 @@ Example response:
 
 ### `POST /api/profile-views/admin`
 
-Resets or sets a counter. This endpoint requires `ADMIN_API_TOKEN` and an `Authorization` header.
+Resets or sets a counter. Pass the optional `platform` field for a platform other than GitHub. This endpoint requires `ADMIN_API_TOKEN` and an `Authorization` header.
 
 Reset a counter:
 

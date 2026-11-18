@@ -1,3 +1,6 @@
+import { getPublicRepositories } from '@/lib/public-repositories'
+import { parsePlatform, platformCounterKey, platformUsername, type Platform } from '@/lib/platforms'
+import { withRepositoryBadge } from '@/lib/repository-badge'
 import { hasBadgeDesign, isNewDesign, NEW_DESIGNS, readBadgeDesign, renderBadgeDesign } from '@/lib/badge-design'
 import { getCounterStore } from '@/lib/counter-store'
 import { createHash } from 'crypto'
@@ -82,10 +85,10 @@ function getClientFingerprint(request: NextRequest, username: string): string {
   return createHash('sha256').update(`${username}:${ip}:${userAgent}`).digest('hex')
 }
 
-async function getViews(request: NextRequest, username: string, mode: CountMode, ttlSeconds: number): Promise<number> {
+async function getViews(request: NextRequest, platform: Platform, username: string, mode: CountMode, ttlSeconds: number): Promise<number> {
   const store = await getCounterStore()
   const visit = mode === 'unique' ? { fingerprint: getClientFingerprint(request, username), ttl: ttlSeconds } : undefined
-  return store.count(`views:${username}`, visit)
+  return store.count(platformCounterKey(platform, username), visit)
 }
 
 function renderIllustratedBadge(label: string, message: string, color: string, style: 'ticket' | 'ledger' | 'orbit') {
@@ -168,7 +171,11 @@ function generateSVG(label: string, message: string, color: string, style: Exclu
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const username = sanitizeText(searchParams.get('username') || 'guest', 'guest', 39).toLowerCase()
+    const platform = parsePlatform(searchParams.get('platform'))
+    const username = platform && platformUsername(searchParams.get('username')?.trim() || 'guest', platform)
+    if (!platform || !username) {
+      return new NextResponse(generateSVG('Error', 'Invalid account', 'dc143c'), { status: 400, headers: { 'Content-Type': 'image/svg+xml; charset=utf-8' } })
+    }
     const label = sanitizeText(searchParams.get('label') || 'Profile views', 'Profile views')
     const color = sanitizeColor(searchParams.get('color') || DEFAULT_COLOR)
     const style = sanitizeStyle(searchParams.get('style'))
@@ -176,14 +183,19 @@ export async function GET(request: NextRequest) {
     const ttlSeconds = sanitizeTtl(searchParams.get('ttl'))
     const isPreview = searchParams.get('preview') === 'true'
 
-    const views = isPreview ? 1234 : await getViews(request, username, mode, ttlSeconds)
+    const showRepositories = searchParams.get('showRepos') === 'true'
+    const [views, repositories] = await Promise.all([
+      isPreview ? 1234 : getViews(request, platform, username, mode, ttlSeconds),
+      showRepositories ? getPublicRepositories(platform, username).catch(() => null) : null,
+    ])
     const message = formatNumber(views)
     const design = readBadgeDesign(searchParams)
     const svg = isNewDesign(style) || hasBadgeDesign(design)
       ? renderBadgeDesign(label, message, `#${color}`, style, design)
       : generateSVG(label, message, color, style)
 
-    return new NextResponse(svg, {
+    const order = searchParams.get('repoOrder') === 'repos-first' ? 'repos-first' : 'views-first'
+    return new NextResponse(showRepositories ? withRepositoryBadge(svg, repositories, order) : svg, {
       headers: {
         'Content-Type': 'image/svg+xml; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -192,7 +204,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('[githubvisitcounter] Profile views API error:', error)
+    console.error('[githubump] Profile views API error:', error)
     const errorSVG = generateSVG('Error', 'Failed', 'dc143c')
     return new NextResponse(errorSVG, {
       status: 500,

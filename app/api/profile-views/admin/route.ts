@@ -1,14 +1,8 @@
+import { parsePlatform, platformCounterKey, platformUsername } from '@/lib/platforms'
 import { getCounterStore } from '@/lib/counter-store'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
-
-function sanitizeUsername(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const username = value.trim().toLowerCase()
-  if (!username || !/^[a-z0-9-]{1,39}$/.test(username)) return null
-  return username
-}
 
 function isAuthorized(request: NextRequest): boolean {
   const token = process.env.ADMIN_API_TOKEN
@@ -22,14 +16,15 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null)
-  const username = sanitizeUsername(body?.username)
+  const platform = parsePlatform(body?.platform)
+  const username = platform && platformUsername(body?.username, platform)
   const action = body?.action
 
-  if (!username) {
-    return NextResponse.json({ error: 'A valid username is required.' }, { status: 400 })
+  if (!platform || !username) {
+    return NextResponse.json({ error: 'A valid platform and username are required.' }, { status: 400 })
   }
 
-  const counterKey = `views:${username}`
+  const counterKey = platformCounterKey(platform, username)
 
   if (action === 'reset') {
     await (await getCounterStore()).set(counterKey, 0)

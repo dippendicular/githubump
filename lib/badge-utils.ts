@@ -1,3 +1,5 @@
+import type { Platform } from './platforms'
+import type { RepositoryOrder } from './repository-badge'
 import type { BadgeDesign } from './badge-design'
 
 export type CountMode = 'unique' | 'total'
@@ -7,6 +9,8 @@ export interface BadgeUrlOptions {
   ttl?: number
   preview?: boolean
   design?: BadgeDesign
+  platform?: Platform
+  repositories?: RepositoryOrder
 }
 
 export function formatNumber(num: number): string {
@@ -37,6 +41,12 @@ export function generateBadgeUrl(
 
   if (options.preview) {
     params.set('preview', 'true')
+  }
+
+  if (options.platform && options.platform !== 'github') params.set('platform', options.platform)
+  if (options.repositories) {
+    params.set('showRepos', 'true')
+    params.set('repoOrder', options.repositories)
   }
 
   const design = options.design

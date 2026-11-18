@@ -3,11 +3,11 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'GitHub Counter',
-  description: 'Generate a custom, self-hosted GitHub profile views counter badge with real-time stats. No third-party services required.',
+  title: 'githubump',
+  description: 'Self-hosted profile view badges for GitHub, GitLab, Forgejo, Gitea, and Codeberg.',
   openGraph: {
-    title: 'GitHub Counter',
-    description: 'Create stunning profile view counters for your GitHub README',
+    title: 'githubump',
+    description: 'Create profile view and public repository badges for your README',
     type: 'website',
   },
 }
