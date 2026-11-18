@@ -464,10 +464,10 @@
 .appearance-card:not([open]) > summary { border-bottom: 0; }
 .appearance-chevron { color: var(--secondary-ink); }
 .appearance-card[open] .appearance-chevron { transform: rotate(180deg); }
-.appearance-card-content { display: grid; gap: 20px; padding: 18px 22px 22px; }
+.appearance-card-content { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 18px 22px 22px; }
 .appearance-section h3 { margin-bottom: 12px; font-family: var(--display-font); font-size: 15px; font-weight: 680; }
 .appearance-section + .appearance-section { border-top: 1px solid var(--line); padding-top: 17px; }
-.appearance-section .style-carousel { margin-bottom: 12px; }
+.appearance-section .style-carousel { margin-block: 9px 12px; }
 
 .style-carousel { min-width: 0; }
 .style-carousel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 620; }

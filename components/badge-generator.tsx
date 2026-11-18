@@ -374,31 +374,7 @@ export default function BadgeGenerator() {
                     if (!event.target.checked && positioning === 'repo') setPositioning(null)
                     setCopyError(false)
                   }} /> Show public repositories on badge</label>
-                  {showRepos && <div className="repository-customization">
-                    <div className="appearance-choice">
-                      <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
-                      <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
-                        setRepoOrder(value)
-                        setCopyError(false)
-                      }} />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="repo-label">Repository label</label>
-                      <input id="repo-label" value={repoLabel} placeholder="Public repos" maxLength={48} onChange={(event) => {
-                        setRepoLabel(event.target.value)
-                        setCopyError(false)
-                      }} />
-                    </div>
-                  </div>}
                 </fieldset>
-
-                <div className="field">
-                  <label htmlFor="badge-label">Badge label</label>
-                  <input id="badge-label" value={label} onChange={(event) => update('label', event.target.value)} placeholder="Profile views" maxLength={48} />
-                </div>
-
-                <BadgeStyleCarousel name="badge-style" label="Badge style" styles={BADGE_STYLES}
-                  thumbnails={THUMBNAILS} value={style} onChange={(value) => update('style', value)} reducedMotion={reduceMotion} />
 
                 <fieldset className="field counting-field">
                   <legend>Counting mode</legend>
@@ -420,11 +396,6 @@ export default function BadgeGenerator() {
                       <p id="ttl-help">Repeat visits count once per window. 60–86,400 seconds.</p>
                     </div>
                   ) : <p className="field-hint">Every badge request adds one view.</p>}
-                  <label className="checkbox-option count-format-option">
-                    <input type="checkbox" checked={countFormat === 'exact'} onChange={(event) => update('countFormat', event.target.checked ? 'exact' : 'compact')} aria-describedby="count-format-help" />
-                    Show full view count
-                  </label>
-                  <p className="field-hint" id="count-format-help">17,654 in full or 17.7K in compact format.</p>
                 </fieldset>
               </div>
             </motion.div>
@@ -436,6 +407,13 @@ export default function BadgeGenerator() {
               <div className="appearance-card-content">
                 <section className="appearance-section" aria-labelledby="views-appearance">
                   <h3 id="views-appearance">Views badge</h3>
+                  <div className="field">
+                    <label htmlFor="badge-label">Badge label</label>
+                    <input id="badge-label" value={label} onChange={(event) => update('label', event.target.value)} placeholder="Profile views" maxLength={48} />
+                  </div>
+
+                  <BadgeStyleCarousel name="badge-style" label="Badge style" styles={BADGE_STYLES}
+                    thumbnails={THUMBNAILS} value={style} onChange={(value) => update('style', value)} reducedMotion={reduceMotion} />
                   <BadgeAppearance prefix="badge" design={design} container={workspace}
                     labelPaint={labelPaint} countPaint={countPaint} onChange={updateDesign} />
                   <div className="color-swatches count-swatches" role="group" aria-label="Count color presets">
@@ -445,10 +423,33 @@ export default function BadgeGenerator() {
                       </button>
                     ))}
                   </div>
+                  <div className="field">
+                    <label className="checkbox-option count-format-option">
+                      <input type="checkbox" checked={countFormat === 'exact'} onChange={(event) => update('countFormat', event.target.checked ? 'exact' : 'compact')} aria-describedby="count-format-help" />
+                      Show full view count
+                    </label>
+                    <p className="field-hint" id="count-format-help">17,654 in full or 17.7K in compact format.</p>
+                  </div>
                 </section>
                 {showRepos && (
                   <section className="appearance-section" aria-labelledby="repo-appearance">
                     <h3 id="repo-appearance">Repository badge</h3>
+                    <div className="repository-customization">
+                      <div className="appearance-choice">
+                        <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
+                        <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
+                          setRepoOrder(value)
+                          setCopyError(false)
+                        }} />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="repo-label">Repository label</label>
+                        <input id="repo-label" value={repoLabel} placeholder="Public repos" maxLength={48} onChange={(event) => {
+                          setRepoLabel(event.target.value)
+                          setCopyError(false)
+                        }} />
+                      </div>
+                    </div>
                     <BadgeStyleCarousel name="repo-badge-style" label="Repository style" styles={REPO_STYLES}
                       thumbnails={THUMBNAILS} value={repoStyle} onChange={(value) => { setRepoStyle(value); setCopyError(false) }} reducedMotion={reduceMotion} />
                     <BadgeAppearance prefix="repo" design={repoDesign} container={workspace}
