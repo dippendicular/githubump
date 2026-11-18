@@ -8,11 +8,12 @@ import {
 } from 'lucide-react'
 import { formatViewCount, formatNumber, generateBadgeUrl, generateMarkdownCode, type CountFormat, type CountMode } from '@/lib/badge-utils'
 import { BADGE_STYLES, type BadgeStyle } from '@/lib/badge-styles'
+import BadgeAppearance from '@/components/badge-appearance'
 import ThemedSelect from '@/components/themed-select'
 import BadgePositionEditor, { type PositionKey } from '@/components/badge-position-editor'
-import { badgeGeometry, FONTS, hasBadgeDesign, isNewDesign, renderBadgeDesign, SHAPES, type BadgeDesign, type Point } from '@/lib/badge-design'
+import { badgeGeometry, hasBadgeDesign, isNewDesign, NEW_DESIGNS, renderBadgeDesign, type BadgeDesign, type Point } from '@/lib/badge-design'
 import { PLATFORMS, PLATFORM_IDS, platformUsername, type Platform } from '@/lib/platforms'
-import { withRepositoryBadge, type RepositoryOrder } from '@/lib/repository-badge'
+import { REPOSITORY_ACCENT, REPOSITORY_STYLE, renderRepositoryBadge, withRepositoryBadge, type RepositoryOrder } from '@/lib/repository-badge'
 import type { GitHubStats } from '@/lib/github-stats'
 
 const DEFAULTS = {
@@ -24,6 +25,8 @@ const DEFAULTS = {
 }
 
 const STYLES = Object.keys(BADGE_STYLES) as BadgeStyle[]
+const REPO_STYLES = { auto: 'Design default', ...NEW_DESIGNS } as const
+type RepoStyle = keyof typeof REPO_STYLES
 const ACCENT = '#0e75b6'
 const ZERO: Point = [0, 0]
 const svgSource = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`
@@ -69,11 +72,14 @@ export default function BadgeGenerator() {
   const [platform, setPlatform] = useState<Platform>('github')
   const [handles, setHandles] = useState<Partial<Record<Platform, string>>>({})
   const [showRepos, setShowRepos] = useState(false)
+  const [repoLabel, setRepoLabel] = useState('')
+  const [repoStyle, setRepoStyle] = useState<RepoStyle>('auto')
+  const [repoDesign, setRepoDesign] = useState<BadgeDesign>({})
   const [repoOrder, setRepoOrder] = useState<RepositoryOrder>('views-first')
   const [viewResult, setViewResult] = useState<{ key: string; count: number | null } | null>(null)
   const [repoResult, setRepoResult] = useState<{ key: string; count: number | null } | null>(null)
   const [design, setDesign] = useState<BadgeDesign>({})
-  const [positioning, setPositioning] = useState(false)
+  const [positioning, setPositioning] = useState<'views' | 'repo' | null>(null)
   const [origin, setOrigin] = useState('')
   const [surface, setSurface] = useState<Theme>('system')
   const [theme, setTheme] = useState<Theme>('system')
@@ -102,12 +108,18 @@ export default function BadgeGenerator() {
   }
   const allViewsUrl = `/views/all/${encodeURIComponent(account)}${aliases.size ? `?${aliases}` : ''}`
   const windowSeconds = ttl ? Math.min(86400, Math.max(60, Math.floor(Number(ttl)))) : Number(DEFAULTS.ttl)
-  const options = { mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined, countFormat }
+  const repositoryBadge = { label: repoLabel, style: repoStyle === 'auto' ? undefined : repoStyle, design: repoDesign }
+  const repositoryGeometry = badgeGeometry(repositoryBadge.style ?? REPOSITORY_STYLE, repoDesign, REPOSITORY_ACCENT)
+  const options = { repositoryBadge, mode, ttl: mode === 'unique' ? windowSeconds : undefined, design, platform, repositories: showRepos ? repoOrder : undefined, countFormat }
   const customPreview = positioning || isNewDesign(style) || hasBadgeDesign(design)
   const geometry = badgeGeometry(style, design, ACCENT)
   const previewLabel = label.trim().slice(0, 48) || DEFAULTS.label
   const customSvg = customPreview ? renderBadgeDesign(previewLabel, formatViewCount(views?.count ?? null, countFormat), ACCENT, style, design) : undefined
-  const previewSvg = customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder) : customSvg
+  const previewSvg = positioning === 'repo'
+    ? renderRepositoryBadge(repositoryCount, repositoryBadge)
+    : customSvg && showRepos && !positioning ? withRepositoryBadge(customSvg, repositoryCount, repoOrder, repositoryBadge) : customSvg
+  const positionGeometry = positioning === 'repo' ? repositoryGeometry : geometry
+  const positionDesign = positioning === 'repo' ? repoDesign : design
   const localPreview = previewSvg ? svgSource(previewSvg) : undefined
   const previewWidth = Number(previewSvg?.match(/^<svg[^>]* width="(\d+)"/)?.[1] ?? geometry.width)
   const countPaint = design.countColor ?? geometry.recipe.count
@@ -252,13 +264,27 @@ export default function BadgeGenerator() {
     setCopyError(false)
   }
 
+  function updateRepoDesign<K extends keyof BadgeDesign>(key: K, value: BadgeDesign[K]) {
+    setRepoDesign((current) => ({ ...current, [key]: value }))
+    setCopyError(false)
+  }
+
+  function resetPositions(repository: boolean) {
+    const updatePositions = repository ? setRepoDesign : setDesign
+    updatePositions((current) => ({ ...current, labelPosition: undefined, countPosition: undefined }))
+    setCopyError(false)
+  }
+
   function reset() {
     setDesign({})
     setPlatform('github')
     setHandles({})
     setShowRepos(false)
     setRepoOrder('views-first')
-    setPositioning(false)
+    setRepoStyle('auto')
+    setRepoLabel('')
+    setRepoDesign({})
+    setPositioning(null)
     setSettings(DEFAULTS)
     setCopyError(false)
     setCopied('')
@@ -338,13 +364,39 @@ export default function BadgeGenerator() {
                   <p aria-live="polite">{repositoryKey ? (repositoryResult ? (repositoryCount === null ? 'Repository count unavailable' : `${repositoryCount.toLocaleString('en-US')} public repositories`) : 'Looking up public repositories…') : 'Enter a username to look up repositories.'}</p>
                   {repositoryKey && <a className="preview-open" href={allViewsUrl}>All platform views <ArrowUpRight size={13} aria-hidden="true" /></a>}
                 </div>
-                <label className="checkbox-option"><input type="checkbox" checked={showRepos} onChange={(event) => { setShowRepos(event.target.checked); setCopyError(false) }} /> Show public repositories on badge</label>
-                {showRepos && <div className="appearance-choice repository-order">
-                  <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
-                  <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
-                    setRepoOrder(value)
-                    setCopyError(false)
-                  }} />
+                <label className="checkbox-option"><input type="checkbox" checked={showRepos} onChange={(event) => {
+                  setShowRepos(event.target.checked)
+                  if (!event.target.checked && positioning === 'repo') setPositioning(null)
+                  setCopyError(false)
+                }} /> Show public repositories on badge</label>
+                {showRepos && <div className="repository-customization">
+                  <div className="appearance-grid">
+                    <div className="appearance-choice">
+                      <label id="repo-order-label" htmlFor="repo-order">Badge order</label>
+                      <ThemedSelect id="repo-order" container={workspace} items={REPOSITORY_ORDERS} value={repoOrder} onChange={(value) => {
+                        setRepoOrder(value)
+                        setCopyError(false)
+                      }} />
+                    </div>
+                    <div className="appearance-choice">
+                      <label id="repo-style-label" htmlFor="repo-style">Repository style</label>
+                      <ThemedSelect id="repo-style" container={workspace} items={REPO_STYLES} value={repoStyle} onChange={(value) => {
+                        setRepoStyle(value)
+                        setCopyError(false)
+                      }} />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="repo-label">Repository label</label>
+                    <input id="repo-label" value={repoLabel} placeholder="Public repos" maxLength={48} onChange={(event) => {
+                      setRepoLabel(event.target.value)
+                      setCopyError(false)
+                    }} />
+                  </div>
+                  <BadgeAppearance prefix="repo" design={repoDesign} container={workspace}
+                    labelPaint={repoDesign.labelColor ?? repositoryGeometry.recipe.label}
+                    countPaint={repoDesign.countColor ?? repositoryGeometry.recipe.count}
+                    onChange={updateRepoDesign} />
                 </div>}
               </fieldset>
 
@@ -371,24 +423,8 @@ export default function BadgeGenerator() {
 
               <fieldset className="field badge-appearance">
                 <legend>Appearance</legend>
-                <div className="appearance-grid">
-                  <div className="appearance-choice">
-                    <label id="badge-font-label" htmlFor="badge-font">Font</label>
-                    <ThemedSelect id="badge-font" container={workspace} items={FONTS} value={design.font ?? 'auto'} onChange={(value) => updateDesign('font', value)} />
-                  </div>
-                  <div className="appearance-choice">
-                    <label id="badge-shape-label" htmlFor="badge-shape">Shape</label>
-                    <ThemedSelect id="badge-shape" container={workspace} items={SHAPES} value={design.shape ?? 'auto'} onChange={(value) => updateDesign('shape', value)} />
-                  </div>
-                  <div className="region-color">
-                    <label>Label color <input type="color" value={labelPaint} onChange={(event) => updateDesign('labelColor', event.target.value)} /></label>
-                    {design.labelColor && <button type="button" className="quiet-button" aria-label="Reset label color" onClick={() => updateDesign('labelColor', undefined)}>Auto</button>}
-                  </div>
-                  <div className="region-color">
-                    <label>Count color <input type="color" value={countPaint} onChange={(event) => updateDesign('countColor', event.target.value)} /></label>
-                    {design.countColor && <button type="button" className="quiet-button" aria-label="Reset count color" onClick={() => updateDesign('countColor', undefined)}>Auto</button>}
-                  </div>
-                </div>
+                <BadgeAppearance prefix="badge" design={design} container={workspace}
+                  labelPaint={labelPaint} countPaint={countPaint} onChange={updateDesign} />
                 <div className="color-swatches count-swatches" role="group" aria-label="Count color presets">
                   {COLORS.map(([name, value]) => (
                     <button key={value} type="button" className="color-swatch" style={{ background: value }} aria-label={name} title={name} aria-pressed={countPaint === value} onClick={() => updateDesign('countColor', value)}>
@@ -441,10 +477,10 @@ export default function BadgeGenerator() {
                   {!validUsername ? <span className="preview-caption">No account selected</span> : failedPreview === previewUrl && !localPreview ? <button type="button" className="quiet-button retry-preview" onClick={() => setFailedPreview('')}>Retry preview</button> : (
                     <div className={customPreview ? "badge-preview-image is-custom" : "badge-preview-image"} style={customPreview ? { '--preview-width': `${previewWidth * zoom / 100}px` } as CSSProperties : undefined}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={localPreview ?? previewUrl} style={customPreview ? undefined : { zoom: zoom / 100 }} alt={`${previewLabel} badge preview`} onError={() => setFailedPreview(previewUrl)} />
-                      {positioning && <BadgePositionEditor label={geometry.label} count={geometry.count}
-                        offsets={{ labelPosition: design.labelPosition ?? ZERO, countPosition: design.countPosition ?? ZERO }}
-                        onMove={(key: PositionKey, value: Point) => updateDesign(key, value)} />}
+                      <img src={localPreview ?? previewUrl} style={customPreview ? undefined : { zoom: zoom / 100 }} alt={positioning === 'repo' ? 'Repository badge preview' : `${previewLabel} badge preview`} onError={() => setFailedPreview(previewUrl)} />
+                      {positioning && <BadgePositionEditor label={positionGeometry.label} count={positionGeometry.count}
+                        offsets={{ labelPosition: positionDesign.labelPosition ?? ZERO, countPosition: positionDesign.countPosition ?? ZERO }}
+                        onMove={(key: PositionKey, value: Point) => (positioning === 'repo' ? updateRepoDesign : updateDesign)(key, value)} />}
                     </div>
                   )}
                 </div>
@@ -457,11 +493,10 @@ export default function BadgeGenerator() {
                   {validUsername && <a className="preview-open" href={previewUrl} target="_blank" rel="noreferrer">Open preview SVG <ArrowUpRight size={13} aria-hidden="true" /></a>}
                 </div>
                 <div className="preview-position-actions">
-                  <button type="button" className="quiet-button" aria-pressed={positioning} onClick={() => setPositioning(!positioning)}><Move size={15} aria-hidden="true" /> {positioning ? 'Done moving' : 'Move label & count'}</button>
-                  {(design.labelPosition?.some(Boolean) || design.countPosition?.some(Boolean)) && <button type="button" className="quiet-button" onClick={() => {
-                    setDesign((current) => ({ ...current, labelPosition: undefined, countPosition: undefined }))
-                    setCopyError(false)
-                  }}>Reset positions</button>}
+                  <button type="button" className="quiet-button" aria-pressed={positioning === 'views'} onClick={() => setPositioning(positioning === 'views' ? null : 'views')}><Move size={15} aria-hidden="true" /> {positioning === 'views' ? 'Done moving views' : 'Move label & count'}</button>
+                  {showRepos && <button type="button" className="quiet-button" aria-pressed={positioning === 'repo'} onClick={() => setPositioning(positioning === 'repo' ? null : 'repo')}><Move size={15} aria-hidden="true" /> {positioning === 'repo' ? 'Done moving repositories' : 'Move repository text'}</button>}
+                  {(design.labelPosition?.some(Boolean) || design.countPosition?.some(Boolean)) && <button type="button" className="quiet-button" onClick={() => resetPositions(false)}>Reset positions</button>}
+                  {showRepos && (repoDesign.labelPosition?.some(Boolean) || repoDesign.countPosition?.some(Boolean)) && <button type="button" className="quiet-button" onClick={() => resetPositions(true)}>Reset repository positions</button>}
                 </div>
                 {positioning && <p className="preview-caption" id="position-help">Drag a handle or use the arrow keys. Hold Shift to move faster.</p>}
                 <p className="preview-caption" aria-live="polite">

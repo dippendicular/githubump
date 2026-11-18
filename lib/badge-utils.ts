@@ -1,6 +1,6 @@
 import type { Platform } from './platforms'
-import type { RepositoryOrder } from './repository-badge'
-import type { BadgeDesign } from './badge-design'
+import type { RepositoryBadgeOptions, RepositoryOrder } from './repository-badge'
+import { writeBadgeDesign, type BadgeDesign } from './badge-design'
 
 export type CountMode = 'unique' | 'total'
 export type CountFormat = 'exact' | 'compact'
@@ -13,6 +13,7 @@ export interface BadgeUrlOptions {
   design?: BadgeDesign
   platform?: Platform
   repositories?: RepositoryOrder
+  repositoryBadge?: RepositoryBadgeOptions
 }
 
 export function formatViewCount(count: number | null, format: CountFormat): string {
@@ -57,14 +58,12 @@ export function generateBadgeUrl(
     params.set('repoOrder', options.repositories)
   }
 
-  const design = options.design
-  if (design) {
-    if (design.shape && design.shape !== 'auto') params.set('shape', design.shape)
-    if (design.font && design.font !== 'auto') params.set('font', design.font)
-    if (design.labelColor) params.set('labelColor', design.labelColor)
-    if (design.countColor) params.set('countColor', design.countColor)
-    if (design.labelPosition?.some(Boolean)) params.set('labelPosition', design.labelPosition.join(','))
-    if (design.countPosition?.some(Boolean)) params.set('countPosition', design.countPosition.join(','))
+  if (options.design) writeBadgeDesign(params, options.design)
+  const repo = options.repositoryBadge
+  if (options.repositories && repo) {
+    if (repo.label?.trim()) params.set('repoLabel', repo.label.trim())
+    if (repo.style) params.set('repoStyle', repo.style)
+    if (repo.design) writeBadgeDesign(params, repo.design, 'repo')
   }
 
   return `${baseUrl}/api/profile-views?${params.toString()}`

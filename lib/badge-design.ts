@@ -66,22 +66,37 @@ function choice<T extends string>(value: string | null, values: Record<T, string
   return value && Object.prototype.hasOwnProperty.call(values, value) ? value as T : undefined
 }
 
-export function readBadgeDesign(params: URLSearchParams): BadgeDesign {
-  function point(key: string): Point | undefined {
-    const value = params.get(key)
+function designKey(key: string, prefix: string) {
+  return prefix ? prefix + key[0].toUpperCase() + key.slice(1) : key
+}
+
+export function readBadgeDesign(params: URLSearchParams, prefix = ''): BadgeDesign {
+  const get = (key: keyof BadgeDesign) => params.get(designKey(key, prefix))
+  function point(key: 'labelPosition' | 'countPosition'): Point | undefined {
+    const value = get(key)
     if (!value || !/^-?\d{1,3},-?\d{1,3}$/.test(value)) return
     const [x, y] = value.split(',').map(Number)
     return [clampOffset(x), clampOffset(y)]
   }
 
   return {
-    shape: choice(params.get('shape'), SHAPES),
-    font: choice(params.get('font'), FONTS),
-    labelColor: badgeColor(params.get('labelColor')),
-    countColor: badgeColor(params.get('countColor')),
+    shape: choice(get('shape'), SHAPES),
+    font: choice(get('font'), FONTS),
+    labelColor: badgeColor(get('labelColor')),
+    countColor: badgeColor(get('countColor')),
     labelPosition: point('labelPosition'),
     countPosition: point('countPosition'),
   }
+}
+
+export function writeBadgeDesign(params: URLSearchParams, design: BadgeDesign, prefix = '') {
+  const set = (key: keyof BadgeDesign, value: string) => params.set(designKey(key, prefix), value)
+  if (design.shape && design.shape !== 'auto') set('shape', design.shape)
+  if (design.font && design.font !== 'auto') set('font', design.font)
+  if (design.labelColor) set('labelColor', design.labelColor)
+  if (design.countColor) set('countColor', design.countColor)
+  if (design.labelPosition?.some(Boolean)) set('labelPosition', design.labelPosition.join(','))
+  if (design.countPosition?.some(Boolean)) set('countPosition', design.countPosition.join(','))
 }
 
 export function hasBadgeDesign(design: BadgeDesign) {

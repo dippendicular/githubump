@@ -139,6 +139,9 @@ Returns an SVG badge and increments the counter for the provided `username`. By 
 | `platform` | string | `github` | `github`, `gitlab`, `forgejo`, `gitea`, or `codeberg` |
 | `showRepos` | boolean | `false` | Add the platform’s public repository count |
 | `repoOrder` | string | `views-first` | Use `repos-first` to show repositories before views |
+| `repoLabel`, `repoStyle` | string | design defaults | Customize the repository badge independently. The editor lists compatible styles. |
+| `repoShape`, `repoFont`, `repoLabelColor`, `repoCountColor` | string | design defaults | Repository-only appearance overrides |
+| `repoLabelPosition`, `repoCountPosition` | `x,y` | `0,0` | Repository-only label and count offsets |
 | `label` | string | `Profile views` | Text shown on the left side of the badge |
 | `color` | string | `0e75b6` | Hex color for the right side of the badge |
 | `style` | string | `flat` | Badge style: `flat`, `flat-square`, `plastic`, `rounded`, `for-the-badge`, `social`, `pill`, `outline`, `terminal`, `minimal`, `ticket`, `ledger`, `orbit`, `arcade`, `blueprint`, `split`, `stamp`, `seal`, `stack`, `meter`, `ribbon`, `crest`, `marquee`, `glass`, `circuit`, `prism`, or `receipt` |

@@ -1,7 +1,7 @@
 import { formatViewCount } from '@/lib/badge-utils'
 import { getPublicRepositories } from '@/lib/public-repositories'
 import { parsePlatform, platformCounterKey, platformUsername, type Platform } from '@/lib/platforms'
-import { withRepositoryBadge } from '@/lib/repository-badge'
+import { readRepositoryBadge, withRepositoryBadge } from '@/lib/repository-badge'
 import { hasBadgeDesign, isNewDesign, NEW_DESIGNS, readBadgeDesign, renderBadgeDesign } from '@/lib/badge-design'
 import { getCounterStore } from '@/lib/counter-store'
 import { createHash } from 'crypto'
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
       : generateSVG(label, message, color, style)
 
     const order = searchParams.get('repoOrder') === 'repos-first' ? 'repos-first' : 'views-first'
-    return new NextResponse(showRepositories ? withRepositoryBadge(svg, repositories, order) : svg, {
+    return new NextResponse(showRepositories ? withRepositoryBadge(svg, repositories, order, readRepositoryBadge(searchParams)) : svg, {
       headers: {
         'Content-Type': 'image/svg+xml; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
