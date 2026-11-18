@@ -5,6 +5,14 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'githubump',
   description: 'Self-hosted profile view badges for GitHub, GitLab, Forgejo, Gitea, and Codeberg.',
+  icons: {
+    icon: ['light', 'dark'].map((theme) => ({
+      url: `/img/icon/githubump_icon_${theme}.png`,
+      type: 'image/png',
+      sizes: '64x64',
+      media: `(prefers-color-scheme: ${theme})`,
+    })),
+  },
   openGraph: {
     title: 'githubump',
     description: 'Create profile view and public repository badges for your README',

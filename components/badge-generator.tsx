@@ -158,6 +158,18 @@ export default function BadgeGenerator() {
   }, [])
 
   useEffect(() => {
+    if (theme === 'system') return
+    const icons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"][href^="/img/icon/githubump_icon_"]'))
+    const originalMedia = icons.map((icon) => icon.media)
+    icons.forEach((icon) => {
+      icon.media = icon.href.endsWith(`_${theme}.png`) ? 'all' : 'not all'
+    })
+    return () => {
+      icons.forEach((icon, index) => { icon.media = originalMedia[index] })
+    }
+  }, [theme])
+
+  useEffect(() => {
     if (platform !== 'github' || !validUsername || !username.trim()) return
     const controller = new AbortController()
     const timer = window.setTimeout(async () => {
@@ -306,11 +318,14 @@ export default function BadgeGenerator() {
     <main ref={workspace} className="badge-workspace" data-theme={theme}>
       <header className="workspace-bar">
         <div className="workspace-width bar-content">
-          <div className="workspace-brand">
+          <picture className="workspace-brand">
+            <source
+              media={theme === 'system' ? '(prefers-color-scheme: dark)' : theme === 'dark' ? 'all' : 'not all'}
+              srcSet="/img/logo/githubump_logo_dark.png"
+            />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/github-counter-mark.webp" width="36" height="36" alt="" />
-            <span>git<strong>hubump</strong></span>
-          </div>
+            <img src="/img/logo/githubump_logo_light.png" width="144" height="48" alt="githubump" />
+          </picture>
           <div className="bar-actions">
             <div className="surface-toggle site-theme" role="group" aria-label="Site theme">
               {THEMES.map(({ value, label, icon: Icon }) => (
